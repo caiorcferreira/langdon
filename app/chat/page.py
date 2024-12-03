@@ -84,7 +84,9 @@ class DetectionEngineeringPage:
         """Main function to render the Streamlit app."""
         self.configure_page()
         # improve initial state handling
-        State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
+        State.init()
+        # if State.get(StateKey.DETECTION_ENG_CURRENT_STEP) is None:
+        #     State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
 
         self.render_sidebar()
         self.render_main_header()

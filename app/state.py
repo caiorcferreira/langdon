@@ -1,9 +1,13 @@
 from enum import Enum
 import streamlit as st
+from streamlit.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class DetectionEngineeringStep(Enum):
-    INTERPRET_THREAT_INTEL = "interpret_threat_intel"
+    INIT = "init"
+    SUGGEST_DETECTION_FROM_INTEL = "suggest_detection_from_intel"
     GENERATE_DETECTION_RULE = "generate_detection_rule"
     DEVELOP_INVESTIGATION_PLAYBOOK = "develop_investigation_playbook"
     QA_REVIEW = "qa_review"
@@ -11,7 +15,8 @@ class DetectionEngineeringStep(Enum):
 
 
 DETECTION_ENGINEERING_STEPS = [
-    DetectionEngineeringStep.INTERPRET_THREAT_INTEL,
+    DetectionEngineeringStep.INIT,
+    DetectionEngineeringStep.SUGGEST_DETECTION_FROM_INTEL,
     DetectionEngineeringStep.GENERATE_DETECTION_RULE,
     DetectionEngineeringStep.DEVELOP_INVESTIGATION_PLAYBOOK,
     DetectionEngineeringStep.QA_REVIEW,
@@ -41,6 +46,17 @@ class StateKey(Enum):
 
 class State:
     @staticmethod
+    def init():
+        if not State.has(StateKey.SUGGESTED_DETECTIONS):
+            State.set(StateKey.SUGGESTED_DETECTIONS, None)
+
+        if not State.has(StateKey.SELECTED_DETECTION):
+            State.set(StateKey.SELECTED_DETECTION, None)
+
+        if not State.has(StateKey.DETECTION_ENG_CURRENT_STEP):
+            State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
+
+    @staticmethod
     def component_key(key: StateKey):
         return f"{key.value}"
 
@@ -54,8 +70,15 @@ class State:
         current_index = DETECTION_ENGINEERING_STEPS.index(current_step)
         next_index = current_index + 1
 
+        # if next_step != DETECTION_ENGINEERING_STEPS[next_index]:
+        #     logger.warning(f"Cannot advance from {DETECTION_ENGINEERING_STEPS[current_step]} to {next_step}. Next step should be {DETECTION_ENGINEERING_STEPS[next_index]}")
+        #     return
+
         if next_index < len(DETECTION_ENGINEERING_STEPS):
             next_step = DETECTION_ENGINEERING_STEPS[next_index]
+            logger.info(
+                f"Advancing from {DETECTION_ENGINEERING_STEPS[current_index]} to next step: {DETECTION_ENGINEERING_STEPS[next_index]}")
+
             State.set(StateKey.DETECTION_ENG_CURRENT_STEP, next_step)
         else:
             st.error("No more steps to advance to.")
@@ -63,3 +86,7 @@ class State:
     @staticmethod
     def get(key: StateKey):
         return st.session_state.get(key.value, None)
+
+    @staticmethod
+    def has(key: StateKey) -> bool:
+        return key.value in st.session_state

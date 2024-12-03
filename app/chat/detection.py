@@ -2,7 +2,7 @@ import streamlit as st
 import fitz
 from app.prompt import suggest_detections_from_intel
 from streamlit.logger import get_logger
-from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS
+from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS, DetectionEngineeringStep
 from .components import line_separator
 
 logger = get_logger(__name__)
@@ -24,6 +24,97 @@ def serialize_file(uploaded_file):
         return uploaded_file.getvalue().decode("utf-8")
 
 
+class DetectionDetailComponent:
+    def __init__(self, detection):
+        self.detection = detection
+
+    def render(self):
+        detection = self.detection
+
+        st.markdown(f"**Detection Name:** {detection.name}")
+        st.write(f"**Threat Behavior:** {detection.threat_behavior}")
+        st.write(f"**Log Evidence:** {detection.log_evidence}")
+        st.write(f"**MITRE ATT&CK Tactic:** {detection.mitre_tactic}")
+        st.write(f"**Context:** {detection.context}")
+
+
+class SuggestDetectionStepComponent:
+    def render(self):
+        """Render the Suggest Detection step."""
+        logger.info("Rendering Suggest Detection step")
+        st.subheader("Step 1: Analyze Threat Intel")
+        # details = st.expander("View Details", expanded=False)
+
+        detections = self.run_analysis()
+
+        self.render_detection_list(detections)
+        self.render_detection_selection()
+
+    def run_analysis(self):
+        detections = State.get(StateKey.SUGGESTED_DETECTIONS)
+        if detections is not None:
+            return detections
+
+        threat_source = State.get(StateKey.THREAT_SOURCE)
+        focus = State.get(StateKey.THREAT_SOURCE_FOCUS)
+        data_source = State.get(StateKey.DATA_SOURCE)
+        model_params = {
+            "temperature": State.get(StateKey.MODEL_TEMPERATURE),
+            "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+        }
+
+        with st.spinner("Analyzing threat intelligence..."):
+            detections = suggest_detections_from_intel(
+                focus=focus,
+                report=threat_source,
+                data_source=data_source,
+                model_params=model_params,
+            )
+
+        if not detections:
+            st.warning("No detections found for the specified data sources.")
+            return
+
+        st.success("Analysis complete!")
+
+        State.set(StateKey.SUGGESTED_DETECTIONS, detections)
+
+        return detections
+
+    def render_detection_list(self, detections):
+        if detections is None:
+            return
+
+        st.info(f"Number of detections found: {len(detections)}")
+
+        st.subheader("Detections found:")
+        for detection in detections:
+            details = DetectionDetailComponent(detection)
+            details.render()
+            st.write("---")
+
+    def render_detection_selection(self):
+        detections = State.get(StateKey.SUGGESTED_DETECTIONS)
+
+        selected_detection_name = st.selectbox("Select a detection to process:", [d.name for d in detections])
+
+        if st.button("Process Selected Detection", type="primary", key="process_selected_detection"):
+            logger.info("Processing selected detection")
+            selected_detection = next(d for d in detections if d.name == selected_detection_name)
+
+            State.advance_detection_engineering_step()
+            State.set(StateKey.SELECTED_DETECTION, selected_detection)
+
+
+class GenerateRuleStepComponent:
+    def render(self):
+        selected_detection = State.get(StateKey.SELECTED_DETECTION)
+
+        st.write("Processing the selected detection:")
+        details = DetectionDetailComponent(selected_detection)
+        details.render()
+
+
 class DetectionCreationView:
     def render(self):
         """Render the Detection Engineering tab."""
@@ -38,56 +129,32 @@ class DetectionCreationView:
         output_container = st.container()
         with output_container:
             line_separator()
-            st.button(
-                "Start detection generation",
-                key="start_detection_generation",
-                type="primary",
-                on_click=lambda: self.start_detection_generation(output_container),
-            )
+            if st.button("Start detection generation", type="primary"):
+                State.advance_detection_engineering_step()
 
+            self.render_output()
 
-    def start_detection_generation(self, parent):
-        """Start the detection generation process."""
-        with parent:
-            st.subheader("Step 1: Analyze Threat Intel")
-            # details = st.expander("View Details", expanded=False)
+    def render_output(self):
+        step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
+        logger.info(f"Rendering output for step {step}")
 
-            threat_source = State.get(StateKey.THREAT_SOURCE)
-            focus = State.get(StateKey.THREAT_SOURCE_FOCUS)
-            data_source = State.get(StateKey.DATA_SOURCE)
-            model_params = {
-                "temperature": State.get(StateKey.MODEL_TEMPERATURE),
-                "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
-            }
+        if step == DETECTION_ENGINEERING_STEPS[1]:
+            logger.info(f"Rendering started 1")
+            view = SuggestDetectionStepComponent()
+            view.render()
 
-            with st.spinner("Analyzing threat intelligence..."):
-                detections = suggest_detections_from_intel(
-                    focus=focus,
-                    report=threat_source,
-                    data_source=data_source,
-                    model_params=model_params,
-                )
+        if step == DETECTION_ENGINEERING_STEPS[2]:
+            logger.info(f"Rendering started 2")
+            view = GenerateRuleStepComponent()
+            view.render()
 
-            if not detections:
-                st.warning("No detections found for the specified data sources.")
-                return
-
-            State.set(StateKey.SUGGESTED_DETECTIONS, detections)
-            st.success("Analysis complete!")
-
-            # Display the number of detections found
-            st.info(f"Number of detections found: {len(detections)}")
-
-            st.subheader("Detections found:")
-            for detection in detections:
-                st.markdown(f"**Detection Name:** {detection.name}")
-                st.write(f"**Threat Behavior:** {detection.threat_behavior}")
-                st.write(f"**Log Evidence:** {detection.log_evidence}")
-                st.write(f"**MITRE ATT&CK Tactic:** {detection.mitre_tactic}")
-                st.write(f"**Context:** {detection.context}")
-                st.write("---")
-
-        State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[1])
+    # def start_detection_generation(self):
+    #     """Start the detection generation process."""
+    #     # with parent:
+    #     #     view = SuggestDetectionStepComponent()
+    #     #     view.render()
+    #
+    #     State.advance_detection_engineering_step()
 
     def render_progress(self):
         current_step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
@@ -127,18 +194,7 @@ class DetectionCreationView:
                 on_change=self.update_threat_source_from_file,
             )
 
-    def render_detection_selection(self):
-        detections = State.get(StateKey.SUGGESTED_DETECTIONS)
 
-        selected_detection_name = st.selectbox("Select a detection to process:",
-                                               [d.name for d in detections])
-
-        if st.button("Process Selected Detection", type="primary"):
-            selected_detection = next(d for d in detections if d.name == selected_detection_name)
-
-            State.set(StateKey.SELECTED_DETECTION, selected_detection)
-            State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[1])
-            State.advance_detection_engineering_step()
 
 
     def update_threat_source_from_file(self):
