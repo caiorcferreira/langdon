@@ -247,6 +247,10 @@ class DetectionCreationView:
                 State.advance_detection_engineering_step()
                 st.rerun()
 
+            if st.button("Reset", type="secondary"):
+                State.reset()
+                st.rerun()
+
             self.render_output()
 
     def render_output(self):

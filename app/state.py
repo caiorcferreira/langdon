@@ -74,6 +74,20 @@ class State:
             State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
 
     @staticmethod
+    def reset():
+        execution_state = [
+            StateKey.SUGGESTED_DETECTIONS,
+            StateKey.SELECTED_DETECTION,
+            StateKey.DETECTION_RULE,
+            StateKey.INVESTIGATION_GUIDE
+        ]
+
+        for key in execution_state:
+            State.set(key, None)
+
+        State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
+
+    @staticmethod
     def component_key(key: StateKey, prefix="", suffix=""):
         return f"{prefix}{key.value}{suffix}"
 
