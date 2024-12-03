@@ -34,16 +34,6 @@ of techniques, tactics and procedures (TTPs) used by cybersecurity threat actors
     suggested_detections: list[Detection] = dspy.OutputField(desc="a list of suggested detections based on the threat intelligence")
 
 
-def suggest_detections_from_intel(focus: str, report: str, data_source: str, model_params: dict) -> list[Detection]:
-    """Interpret the threat intelligence report and extract potential detections."""
-    configure_lm("openai")
-
-    predictor = dspy.ChainOfThought(SuggestDetectionFromIntel, **model_params)
-    output = predictor(focus=focus, report=report, data_source=data_source)
-
-    return output.suggested_detections
-
-
 class DetectionRule(BaseModel):
     code: str = Field(description="detection rule code")
     logic: str = Field(description="explanation of the rule's logic")
@@ -58,7 +48,8 @@ You are an experienced detection engineer specialized in creating robust detecti
 Ensure that:
 - The detection rule accurately captures the threat behavior described.
 - The detection rule is written in the specified detection language.
-- The detection rule uses the specific log data identified.
+- The detection rule follows the data conventions (field name, types, etc) presented in the example log data, if provided.
+- The detection rule follows the format and idioms used in example detection rules, if provided.
 
 # STEPS
 1. Understand the Threat Behavior
@@ -82,8 +73,8 @@ Ensure that:
 - Ensure your response is clear, professional, and free of errors.
 """
     detection_description: Detection = dspy.InputField(desc="description of the detection rule to be created")
-    # todo: add example detections
     detection_language: str = dspy.InputField(desc="detection language to write the detection rule in")
+    example_detection_rules: list[str] = dspy.InputField(desc="example detection rules showing the format and idioms used in detection rules")
     example_logs: list[str] = dspy.InputField(desc="example logs showing the structure of log data or events")
     detection_steps: Optional[str] = dspy.InputField(desc="outline the steps typically followed when writing detection rules (optional)")
 
@@ -137,10 +128,12 @@ class PromptSignature:
         predictor = dspy.ChainOfThought(SuggestDetectionFromIntel, **model_params)
         output = predictor(focus=focus, report=report, data_source=data_source)
 
+        dspy.inspect_history(n=1)
+
         return output.suggested_detections
 
     @staticmethod
-    def create_detection_rule(detection_description: Detection, detection_language: str, example_logs: list[str], detection_steps: Optional[str], model_params: dict):
+    def create_detection_rule(detection_description: Detection, detection_language: str, example_logs: list[str], example_detections: list[str], detection_steps: Optional[str], model_params: dict):
         """Create a detection rule based on the provided detection description."""
         configure_lm("openai")
 
@@ -151,9 +144,12 @@ class PromptSignature:
             detection_description=detection_description,
             detection_language=detection_language,
             example_logs=example_logs,
+            example_detection_rules=example_detections,
             detection_steps=detection_steps,
         )
         rendered_prompt = logging_callback.history
+
+        dspy.inspect_history(n=1)
 
         return output.detection_rule, rendered_prompt
 
@@ -169,6 +165,8 @@ class PromptSignature:
             example_standard_operation_procedure=standard_op_procedure,
         )
         rendered_prompt = logging_callback.history
+
+        dspy.inspect_history(n=1)
 
         return output.investigation_guide, rendered_prompt
 

@@ -1,6 +1,7 @@
 from enum import Enum
 import streamlit as st
 from streamlit.logger import get_logger
+from typing import Any
 
 logger = get_logger(__name__)
 
@@ -72,12 +73,16 @@ class State:
             State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
 
     @staticmethod
-    def component_key(key: StateKey):
-        return f"{key.value}"
+    def component_key(key: StateKey, prefix="", suffix=""):
+        return f"{prefix}{key.value}{suffix}"
 
     @staticmethod
-    def set(key: StateKey, value):
-        st.session_state[key.value] = value
+    def set(key: StateKey | str, value: Any):
+        key_val = key
+        if isinstance(key, StateKey):
+            key_val = key.value
+
+        st.session_state[key_val] = value
 
     @staticmethod
     def advance_detection_engineering_step():
@@ -99,12 +104,20 @@ class State:
             st.error("No more steps to advance to.")
 
     @staticmethod
-    def get(key: StateKey):
-        return st.session_state.get(key.value, None)
+    def get(key: StateKey | str):
+        key_val = key
+        if isinstance(key, StateKey):
+            key_val = key.value
+
+        return st.session_state.get(key_val, None)
 
     @staticmethod
-    def has(key: StateKey) -> bool:
-        return key.value in st.session_state
+    def has(key: StateKey | str) -> bool:
+        key_val = key
+        if isinstance(key, StateKey):
+            key_val = key.value
+
+        return key_val in st.session_state
 
 
 def step_update_transaction():

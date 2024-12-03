@@ -44,6 +44,7 @@ class SuggestDetectionStepComponent:
         logger.info("Rendering Suggest Detection step")
         st.subheader("Step 1: Analyze Threat Intel")
 
+        # todo: do not run without file or scrape link / and focus
         detections = self.run_analysis()
 
         self.render_detection_list(detections)
@@ -65,7 +66,7 @@ class SuggestDetectionStepComponent:
         }
 
         with st.spinner("Analyzing threat intelligence..."):
-            detections = suggest_detections_from_intel(
+            detections = PromptSignature.suggest_detections_from_intel(
                 focus=focus,
                 report=threat_source,
                 data_source=data_source,
@@ -140,6 +141,10 @@ class GenerateRuleStepComponent:
 
         detection_lang = State.get(StateKey.DETECTION_LANG)
         example_logs = State.get(StateKey.EXAMPLE_LOGS)
+        logger.info(f"Example logs: {example_logs}")
+        example_detections = State.get(StateKey.EXAMPLE_DETECTIONS)
+        logger.info(f"Example detections: {example_detections}")
+
         detection_steps = State.get(StateKey.DETECTION_STEPS)
         model_params = {
             "temperature": State.get(StateKey.MODEL_TEMPERATURE),
@@ -150,7 +155,8 @@ class GenerateRuleStepComponent:
             detection_rule, debug_info = PromptSignature.create_detection_rule(
                 detection_description=detection,
                 detection_language=detection_lang,
-                example_logs=example_logs,
+                example_logs=[],
+                example_detections=[],
                 detection_steps=detection_steps,
                 model_params=model_params,
             )
@@ -222,18 +228,15 @@ class DetectionCreationView:
         output_container = st.container()
         with output_container:
             line_separator()
-            st.button(
+            if st.button(
                 "Start detection generation",
                 type="primary",
-                on_click=self.start_detection_generation,
                 disabled=State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.INIT,
-            )
+            ):
+                State.advance_detection_engineering_step()
+                st.rerun()
 
             self.render_output()
-
-    def start_detection_generation(self):
-        State.advance_detection_engineering_step()
-        st.rerun()
 
     def render_output(self):
         step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
@@ -258,6 +261,7 @@ class DetectionCreationView:
 
     def render_progress(self):
         current_step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
+        logger.info(f"Rendering progress bar for {current_step}, of all {DETECTION_ENGINEERING_STEPS}")
         step_index = DETECTION_ENGINEERING_STEPS.index(current_step) + 1
         total = len(DETECTION_ENGINEERING_STEPS)
 
@@ -325,23 +329,54 @@ class DetectionCreationView:
     def render_example_detections(self):
         """Render the Example Detections section."""
         st.subheader("Example Detections")
-        example_count = st.number_input("Number of example detections", min_value=1, max_value=5, value=2)
+        example_count = st.number_input(
+            "Number of example detections",
+            min_value=1,
+            max_value=5,
+            value=2,
+            key=State.component_key(StateKey.EXAMPLE_DETECTIONS, suffix="_size"),
+        )
+
         for i in range(1, int(example_count) + 1):
             st.text_area(
                 f"Example detection {i}",
                 placeholder=f"SELECT DISTINCT * FROM control",
                 height=100,
+                key=State.component_key(StateKey.EXAMPLE_DETECTIONS, suffix=f"_{i-1}"),
+                on_change=self.update_list(StateKey.EXAMPLE_DETECTIONS, i-1),
             )
 
 
     def render_example_logs(self):
         """Render the Example Logs section."""
         st.subheader("Example Logs")
-        example_count = st.number_input("Number of example logs", min_value=1, max_value=5, value=2)
+        example_count = st.number_input(
+            "Number of example logs",
+            min_value=1,
+            max_value=5,
+            value=2,
+            key=State.component_key(StateKey.EXAMPLE_LOGS, suffix="_size")
+        )
+
         for i in range(1, int(example_count) + 1):
             st.text_area(
                 f"Example log {i}",
                 placeholder=f"paste examples of your actual logs here, you may have different field names or logging structure",
                 height=100,
+                key=State.component_key(StateKey.EXAMPLE_LOGS, suffix=f"_{i-1}"),
+                on_change=self.update_list(StateKey.EXAMPLE_LOGS, i-1),
             )
 
+    def update_list(self, state_key, index):
+        def update():
+            current_list = State.get(state_key)
+            if current_list is None:
+                size = State.get(State.component_key(state_key, suffix="_size"))
+                current_list = [None] * size
+
+            value = State.get(State.component_key(state_key, suffix=f"_{index}"))
+
+            current_list[index] = value
+            State.set(state_key, current_list)
+
+        return update
