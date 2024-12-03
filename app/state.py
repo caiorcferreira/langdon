@@ -33,18 +33,33 @@ class StateKey(Enum):
     THREAT_SOURCE_FOCUS = "threat_source_focus"
     UPLOADED_THREAT_FILE = "uploaded_threat_file"
     SUGGESTED_DETECTIONS = "suggested_detections"
+    SELECTED_DETECTION = "selected_detection"
 
     EXAMPLE_DETECTIONS = "example_detections"
     EXAMPLE_LOGS = "example_logs"
 
 
-def component_key(key: StateKey):
-    return f"{key.value}"
+class State:
+    @staticmethod
+    def component_key(key: StateKey):
+        return f"{key.value}"
 
+    @staticmethod
+    def set(key: StateKey, value):
+        st.session_state[key.value] = value
 
-def set_state(key: StateKey, value):
-    st.session_state[key.value] = value
+    @staticmethod
+    def advance_detection_engineering_step():
+        current_step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
+        current_index = DETECTION_ENGINEERING_STEPS.index(current_step)
+        next_index = current_index + 1
 
+        if next_index < len(DETECTION_ENGINEERING_STEPS):
+            next_step = DETECTION_ENGINEERING_STEPS[next_index]
+            State.set(StateKey.DETECTION_ENG_CURRENT_STEP, next_step)
+        else:
+            st.error("No more steps to advance to.")
 
-def get_state(key: StateKey):
-    return st.session_state.get(key.value, None)
+    @staticmethod
+    def get(key: StateKey):
+        return st.session_state.get(key.value, None)

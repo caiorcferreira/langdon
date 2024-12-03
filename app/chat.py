@@ -3,7 +3,7 @@ import fitz
 from .prompt import suggest_detections_from_intel, configure_lm
 from streamlit.logger import get_logger
 import dspy
-from .state import StateKey, component_key, set_state, get_state, DETECTION_ENGINEERING_STEPS
+from .state import StateKey, State, DETECTION_ENGINEERING_STEPS
 
 logger = get_logger(__name__)
 
@@ -56,12 +56,12 @@ class DetectionCreationView:
             st.subheader("Step 1: Analyze Threat Intel")
             # details = st.expander("View Details", expanded=False)
 
-            threat_source = get_state(StateKey.THREAT_SOURCE)
-            focus = get_state(StateKey.THREAT_SOURCE_FOCUS)
-            data_source = get_state(StateKey.DATA_SOURCE)
+            threat_source = State.get(StateKey.THREAT_SOURCE)
+            focus = State.get(StateKey.THREAT_SOURCE_FOCUS)
+            data_source = State.get(StateKey.DATA_SOURCE)
             model_params = {
-                "temperature": get_state(StateKey.MODEL_TEMPERATURE),
-                "max_tokens": get_state(StateKey.MODEL_MAX_TOKENS),
+                "temperature": State.get(StateKey.MODEL_TEMPERATURE),
+                "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
             }
 
             with st.spinner("Analyzing threat intelligence..."):
@@ -76,7 +76,7 @@ class DetectionCreationView:
                 st.warning("No detections found for the specified data sources.")
                 return
 
-            set_state(StateKey.SUGGESTED_DETECTIONS, detections)
+            State.set(StateKey.SUGGESTED_DETECTIONS, detections)
             st.success("Analysis complete!")
 
             # Display the number of detections found
@@ -91,10 +91,10 @@ class DetectionCreationView:
                 st.write(f"**Context:** {detection.context}")
                 st.write("---")
 
-        set_state(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[1])
+        State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[1])
 
     def render_progress(self):
-        current_step = get_state(StateKey.DETECTION_ENG_CURRENT_STEP)
+        current_step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
         step_index = DETECTION_ENGINEERING_STEPS.index(current_step) + 1
         total = len(DETECTION_ENGINEERING_STEPS)
 
@@ -109,7 +109,7 @@ class DetectionCreationView:
         with col1:
             st.text_area(
                 "Explain your focus subject in the threat report:",
-                key=component_key(StateKey.THREAT_SOURCE_FOCUS),
+                key=State.component_key(StateKey.THREAT_SOURCE_FOCUS),
                 placeholder="Detect persistence and execution from a compromised Lambda.",
                 height=400,
             )
@@ -126,17 +126,31 @@ class DetectionCreationView:
             st.file_uploader(
                 "Upload file (optional):",
                 type=["txt", "pdf"],
-                key=component_key(StateKey.UPLOADED_THREAT_FILE),
+                key=State.component_key(StateKey.UPLOADED_THREAT_FILE),
                 label_visibility="visible",
                 on_change=self.update_threat_source_from_file,
             )
 
+    def render_detection_selection(self):
+        detections = State.get(StateKey.SUGGESTED_DETECTIONS)
+
+        selected_detection_name = st.selectbox("Select a detection to process:",
+                                               [d.name for d in detections])
+
+        if st.button("Process Selected Detection", type="primary"):
+            selected_detection = next(d for d in detections if d.name == selected_detection_name)
+
+            State.set(StateKey.SELECTED_DETECTION, selected_detection)
+            State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[1])
+            State.advance_detection_engineering_step()
+
+
     def update_threat_source_from_file(self):
         """Update the threat source based on the uploaded file."""
-        uploaded_file = get_state(StateKey.UPLOADED_THREAT_FILE)
+        uploaded_file = State.get(StateKey.UPLOADED_THREAT_FILE)
         logger.info(f"Uploaded File: {uploaded_file}")
 
-        set_state(StateKey.THREAT_SOURCE, serialize_file(uploaded_file))
+        State.set(StateKey.THREAT_SOURCE, serialize_file(uploaded_file))
 
     def render_example_detections(self):
         """Render the Example Detections section."""
@@ -184,8 +198,8 @@ class DetectionEngineeringApp:
     def render_configuration_section(self):
         """Render the configuration section in the sidebar."""
         st.write("### Configuration")
-        st.selectbox("LLM Provider", ["OpenAI", "Claude", "Other"], key=component_key(StateKey.LLM_PROVIDER))
-        st.selectbox("Model Type", ["gpt-4o-mini", "gpt-3.5", "Claude-mini"], key=component_key(StateKey.MODEL))
+        st.selectbox("LLM Provider", ["OpenAI", "Claude", "Other"], key=State.component_key(StateKey.LLM_PROVIDER))
+        st.selectbox("Model Type", ["gpt-4o-mini", "gpt-3.5", "Claude-mini"], key=State.component_key(StateKey.MODEL))
         st.multiselect(
             "Security Data/Log Type(s)",
             [
@@ -194,12 +208,12 @@ class DetectionEngineeringApp:
                 "GCP Audit Logs",
             ],
             default=["AWS CloudTrail Logs"],
-            key=component_key(StateKey.DATA_SOURCE),
+            key=State.component_key(StateKey.DATA_SOURCE),
         )
         st.selectbox(
             "Detection Language",
             ["Hunters (Snowflake SQL)", "KQL", "SQL"],
-            key=component_key(StateKey.DETECTION_LANG),
+            key=State.component_key(StateKey.DETECTION_LANG),
         )
 
         st.write("### Model Parameters")
@@ -209,14 +223,14 @@ class DetectionEngineeringApp:
             max_value=1.0,
             value=0.5,
             step=0.01,
-            key=component_key(StateKey.MODEL_TEMPERATURE),
+            key=State.component_key(StateKey.MODEL_TEMPERATURE),
         )
         st.number_input(
             "Max Tokens",
             min_value=1,
             max_value=4096,
             value=4096,
-            key=component_key(StateKey.MODEL_MAX_TOKENS),
+            key=State.component_key(StateKey.MODEL_MAX_TOKENS),
         )
 
     def render_main_header(self):
@@ -240,7 +254,8 @@ class DetectionEngineeringApp:
     def render(self):
         """Main function to render the Streamlit app."""
         self.configure_page()
-        set_state(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
+        # improve initial state handling
+        State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
 
         self.render_sidebar()
         self.render_main_header()
@@ -250,4 +265,3 @@ class DetectionEngineeringApp:
 
         with tabs[0]:
             detection_tab.render()
-
