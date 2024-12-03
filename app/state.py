@@ -13,6 +13,15 @@ class DetectionEngineeringStep(Enum):
     QA_REVIEW = "qa_review"
     FINAL_SUMMARY = "final_summary"
 
+    def __lt__(self, other):
+        self_index = DETECTION_ENGINEERING_STEPS.index(self)
+        other_index = DETECTION_ENGINEERING_STEPS.index(other)
+
+        return self_index < other_index
+
+    def __gt__(self, other):
+        return self != other and not self < other
+
 
 DETECTION_ENGINEERING_STEPS = [
     DetectionEngineeringStep.INIT,
@@ -66,13 +75,13 @@ class State:
 
     @staticmethod
     def advance_detection_engineering_step():
+        """
+        Advance the detection engineering step to the next step.
+        NOTE: call st.rerun() after calling this method to re-render the page.
+        """
         current_step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
         current_index = DETECTION_ENGINEERING_STEPS.index(current_step)
         next_index = current_index + 1
-
-        # if next_step != DETECTION_ENGINEERING_STEPS[next_index]:
-        #     logger.warning(f"Cannot advance from {DETECTION_ENGINEERING_STEPS[current_step]} to {next_step}. Next step should be {DETECTION_ENGINEERING_STEPS[next_index]}")
-        #     return
 
         if next_index < len(DETECTION_ENGINEERING_STEPS):
             next_step = DETECTION_ENGINEERING_STEPS[next_index]

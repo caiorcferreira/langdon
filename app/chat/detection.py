@@ -102,8 +102,10 @@ class SuggestDetectionStepComponent:
             logger.info("Processing selected detection")
             selected_detection = next(d for d in detections if d.name == selected_detection_name)
 
-            State.advance_detection_engineering_step()
             State.set(StateKey.SELECTED_DETECTION, selected_detection)
+
+            State.advance_detection_engineering_step()
+            st.rerun()
 
 
 class GenerateRuleStepComponent:
@@ -114,10 +116,13 @@ class GenerateRuleStepComponent:
         details = DetectionDetailComponent(selected_detection)
         details.render()
 
+        line_separator()
+
 
 class DetectionCreationView:
     def render(self):
         """Render the Detection Engineering tab."""
+        logger.info("rerendering")
         self.render_progress()
 
         self.render_threat_intelligence_input()
@@ -129,32 +134,37 @@ class DetectionCreationView:
         output_container = st.container()
         with output_container:
             line_separator()
-            if st.button("Start detection generation", type="primary"):
-                State.advance_detection_engineering_step()
+            st.button(
+                "Start detection generation",
+                type="primary",
+                on_click=self.start_detection_generation
+            )
 
             self.render_output()
+
+    def start_detection_generation(self):
+        State.advance_detection_engineering_step()
+        st.rerun()
 
     def render_output(self):
         step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
         logger.info(f"Rendering output for step {step}")
 
-        if step == DETECTION_ENGINEERING_STEPS[1]:
-            logger.info(f"Rendering started 1")
-            view = SuggestDetectionStepComponent()
+        step_render = {
+            DetectionEngineeringStep.SUGGEST_DETECTION_FROM_INTEL: SuggestDetectionStepComponent(),
+            DetectionEngineeringStep.GENERATE_DETECTION_RULE: GenerateRuleStepComponent(),
+        }
+
+        for s in DETECTION_ENGINEERING_STEPS:
+            if s > step:
+                break
+
+            view = step_render.get(s)
+            if view is None:
+                continue
+
             view.render()
 
-        if step == DETECTION_ENGINEERING_STEPS[2]:
-            logger.info(f"Rendering started 2")
-            view = GenerateRuleStepComponent()
-            view.render()
-
-    # def start_detection_generation(self):
-    #     """Start the detection generation process."""
-    #     # with parent:
-    #     #     view = SuggestDetectionStepComponent()
-    #     #     view.render()
-    #
-    #     State.advance_detection_engineering_step()
 
     def render_progress(self):
         current_step = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)

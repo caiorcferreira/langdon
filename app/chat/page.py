@@ -82,9 +82,11 @@ class DetectionEngineeringPage:
 
     def render(self):
         """Main function to render the Streamlit app."""
+        logger.info("rerendering page")
+
         self.configure_page()
         # improve initial state handling
-        State.init()
+
         # if State.get(StateKey.DETECTION_ENG_CURRENT_STEP) is None:
         #     State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
 
