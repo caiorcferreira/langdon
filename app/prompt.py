@@ -119,6 +119,132 @@ Ensure that:
     investigation_guide: str = dspy.OutputField(desc="investigation guide to triage and investigate detection rule alerts")
 
 
+class QAReview(dspy.Signature):
+    """# ROLE AND PURPOSE
+You are a QA specialist in cyber threat detection with extensive experience. Your task is to conduct a thorough and comprehensive review of a given detection rule, providing detailed assessments and actionable recommendations.
+
+# STEPS
+1.	Understand the Detection Rule and Analysis
+    - Carefully read the detection rule provided as input.
+    - Review the analysis from threat intelligence given as input.
+    - Ensure you fully comprehend the detection logic and the threat behavior it is intended to capture.
+2.	Assess the Detection Rule
+    For each of the following aspects, provide:
+        - A score out of 10.
+        - A detailed explanation of your assessment.
+        - Specific, actionable recommendations for improvement.
+        - If no changes are needed, a thorough justification for why the current version is optimal.
+
+    Aspects to Assess:
+    1.	Syntactic Correctness
+        - Is the rule syntactically correct based on the detection language?
+        - Are there any syntax errors or potential runtime issues?
+        - Does it follow best practices and conventions for the detection language?
+    2.	Logical Accuracy
+        - Does the rule accurately capture all aspects of the threat behavior described in the analysis?
+        - Are there any logical errors or misinterpretations of the threat intelligence?
+        - Is the detection logic complete and comprehensive?
+    3.	Coverage
+        - Does the rule cover all potential variations of the threat behavior?
+        - Are there any edge cases or scenarios not addressed by the current implementation?
+    4.	Performance and Efficiency
+        - Is the detection optimized for performance in the target environment?
+        - Are there any potential bottlenecks or resource	-intensive operations?
+        - Could the rule be optimized without sacrificing accuracy?
+    5.	False Positive/Negative Analysis
+        - Provide a realistic estimate of both false positive and false negative rates.
+        - Justify your estimates with specific scenarios or data points.
+        - Suggest ways to minimize false positives without increasing false negatives.
+    6.	Robustness and Evasion Resistance
+        - How easily could an attacker evade this detection?
+        - Are there any obvious bypass methods?
+        - Suggest improvements to make the detection more robust against evasion techniques.
+    7.	Investigation Guide Quality
+        - Are the investigation steps clear, comprehensive, and actionable?
+        - Do they cover all necessary aspects of validation, investigation, and response?
+        - Are there any missing steps or areas that need more detail?
+    8.	Integration and Dependencies
+        - Does the rule rely on any external data sources or lookups?
+        - Are there any potential issues with data availability or freshness?
+    9.	Maintenance and Updatability
+        - How easily can this rule be updated or modified in the future?
+        - Are there any hard-coded elements that might require frequent updates?
+    10.	Overall Effectiveness
+        - How well does the detection rule achieve its intended purpose?
+        - Does it strike a good balance between accuracy, performance, and maintainability?
+    3.	Compile the QA Report
+        - Present your findings as a structured report with clear recommendations for each aspect.
+        - Include code snippets or pseudo-code where applicable to illustrate suggested improvements.
+        - Ensure your report is clear, professional, and free of errors.
+    4.	Provide an Overall Assessment
+        - Conclude with an overall assessment of the detection rule’s quality and readiness for production deployment.
+        - Include the total score out of 100.
+        - Provide a brief explanation of the total score.
+
+# ADDITIONAL INSTRUCTIONS
+- If you cannot perform a complete assessment due to missing information, explain why and specify the missing details.
+- Use clear and professional language throughout your report.
+- Separate code snippets from the main text for readability.
+- Ensure that all recommendations are specific and actionable.
+- Return the score separated from the assessment.
+"""
+    detection_description: Detection = dspy.InputField(desc="detection description based on threat intel")
+    detection_rule: DetectionRule = dspy.InputField(desc="detection rule implementation to be reviewed")
+    score: int = dspy.OutputField(desc="total score out of 100")
+    assessment: str = dspy.OutputField(desc="detailed assessment of the detection rule")
+
+
+class FinalSummary(dspy.Signature):
+    """# ROLE AND PURPOSE
+You are a senior threat analyst tasked with compiling a comprehensive detection package for the security operations team. Your goal is to produce a markdown-formatted document that is well-structured, comprehensive, and ready for review and implementation.
+
+# STEPS
+1.	Analyze the Components
+    - Carefully read the Detection Rule, Investigation Steps, and QA Findings provided.
+    - Understand the threat behavior that the Detection Rule aims to identify.
+    - Note any key issues or recommendations highlighted in the QA Findings.
+2.	Compile the Detection Package
+    - Create a markdown-formatted document using the following template:
+        # [Threat TTP Name]: [Detection Rule Name]
+
+        ## Threat Description
+        [Provide a concise description of the threat behavior this detection aims to identify.]
+
+        ## Detection Rule
+        {detection_language}
+        ```{previous_detection_rule}```
+
+        ## Log Sources
+        [List the specific log sources or data types required for this detection.]
+
+        ## Investigation Steps
+        [Provide a numbered list of investigation steps from the provided Investigation Steps.]
+
+        ## Performance Considerations
+        [Include brief notes on expected performance, including estimated false positive rate.]
+
+        ## Quality Assessment
+        [Provide the overall score out of 100 and summarize the key points from the QA Findings.]
+
+3.	Review and Finalize
+    - Ensure all sections are complete and accurately reflect the provided information.
+    - Use clear, professional language and correct markdown formatting.
+    - Verify that the document is ready for review and implementation by the security operations team.
+
+# ADDITIONAL INSTRUCTIONS
+
+- If any information is missing or incomplete, indicate this in the relevant section.
+- Keep code blocks and explanations separate for clarity.
+- Ensure your response is free of errors and adheres to the specified format.
+"""
+    detection_description: Detection = dspy.InputField(desc="detection description based on threat intel")
+    detection_rule: DetectionRule = dspy.InputField(desc="detection rule implementation to be reviewed")
+    investigation_guide: str = dspy.InputField(desc="investigation guide for the detection rule")
+    qa_assessment: str = dspy.InputField(desc="QA assessment of the detection rule")
+    qa_score: int = dspy.InputField(desc="QA score out of 100")
+    final_summary: str = dspy.OutputField(desc="markdown-formatted document for the detection package")
+
+
 class PromptSignature:
     @staticmethod
     def suggest_detections_from_intel(focus: str, report: str, data_source: str, model_params: dict) -> list[Detection]:
@@ -169,6 +295,45 @@ class PromptSignature:
         dspy.inspect_history(n=1)
 
         return output.investigation_guide, rendered_prompt
+
+    @staticmethod
+    def qa_review(detection_description: Detection, detection_rule: DetectionRule, model_params: dict):
+        """Conduct a thorough and comprehensive review of a given detection rule."""
+        configure_lm("openai")
+
+        logging_callback = ModuleLoggingCallback()
+
+        predictor = dspy.ChainOfThought(QAReview, callbacks=[logging_callback], **model_params)
+        output = predictor(
+            detection_description=detection_description,
+            detection_rule=detection_rule,
+        )
+        rendered_prompt = logging_callback.history
+
+        dspy.inspect_history(n=1)
+
+        return output.score, output.assessment, rendered_prompt
+
+    @staticmethod
+    def final_summary(detection_description: Detection, detection_rule: DetectionRule, investigation_guide: str, qa_assessment: str, qa_score: int, model_params: dict):
+        """Compile a comprehensive detection package for the security operations team."""
+        configure_lm("openai")
+
+        logging_callback = ModuleLoggingCallback()
+
+        predictor = dspy.ChainOfThought(FinalSummary, callbacks=[logging_callback], **model_params)
+        output = predictor(
+            detection_description=detection_description,
+            detection_rule=detection_rule,
+            investigation_guide=investigation_guide,
+            qa_assessment=qa_assessment,
+            qa_score=qa_score,
+        )
+        rendered_prompt = logging_callback.history
+
+        dspy.inspect_history(n=1)
+
+        return output.final_summary, rendered_prompt
 
 
 

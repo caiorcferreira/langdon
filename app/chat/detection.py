@@ -1,9 +1,11 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import fitz
 from app.prompt import PromptSignature
 from streamlit.logger import get_logger
 from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS, DetectionEngineeringStep, step_update_transaction
 from .components import line_separator
+import pyperclip
 
 logger = get_logger(__name__)
 
@@ -221,6 +223,123 @@ class InvestigationGuideStepComponent:
         return investigation_guide, debug_info
 
 
+class QAReviewStepComponent:
+    def render(self):
+        """Render the Quality Assurance Review step."""
+        logger.info("Rendering Quality Assurance Review")
+        st.subheader("Step 4: Quality Assurance Review")
+
+        with step_update_transaction():
+            _, _, debug_info = self.run_review()
+            self.render_debug_info(success_msg="Quality Assurance Review complete!", debug_info=debug_info)
+
+    def render_debug_info(self, success_msg, debug_info):
+        st.success(success_msg)
+
+        with st.expander("View Details", expanded=False):
+            st.write("Debug information:")
+            st.text(debug_info)
+
+    def run_review(self):
+        review = State.get(StateKey.QA_REVIEW)
+        if review is not None:
+            return review[0], review[1], review[1]
+
+        selected_detection = State.get(StateKey.SELECTED_DETECTION)
+        detection_rule, _ = State.get(StateKey.DETECTION_RULE)
+        model_params = {
+            "temperature": State.get(StateKey.MODEL_TEMPERATURE),
+            "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+        }
+
+        with st.spinner("Processing QA assessment..."):
+            score, review, debug_info = PromptSignature.qa_review(
+                detection_description=selected_detection,
+                detection_rule=detection_rule,
+                model_params=model_params,
+            )
+
+        State.set(StateKey.QA_REVIEW, (score, review, debug_info))
+        State.advance_detection_engineering_step()
+
+        return score, review, debug_info
+
+
+class FinalSummaryStepComponent:
+    def render(self):
+        """Render the Quality Assurance Review step."""
+        logger.info("Rendering Quality Assurance Review")
+        st.subheader("Step 5: Final Summary")
+
+        _, debug_info = self.run_summary()
+        self.render_debug_info(success_msg="Final Summary complete!", debug_info=debug_info)
+        line_separator()
+        self.render_summary()
+
+        # st.rerun()
+
+    def render_summary(self):
+        summary, _ = State.get(StateKey.FINAL_SUMMARY)
+        if summary is None:
+            return
+
+        st.markdown(summary)
+
+        if st.button("Reset", type="secondary", key="bottom_summary_reset"):
+            State.reset()
+
+        if st.button("Copy final summary to clipboard", type="primary", key="bottom_summary_copy"):
+            # components.html(f"""
+            #     <script>
+            #     function copyToClipboard() {{
+            #         var text = `{summary}`;
+            #         navigator.clipboard.writeText(text).then(function() {{
+            #             console.log('Copied to clipboard successfully!');
+            #         }}, function(err) {{
+            #             console.error('Could not copy text: ', err);
+            #         }});
+            #     }}
+            #     copyToClipboard();
+            #     </script>
+            # """, height=0)
+            pyperclip.copy(summary)
+
+    def render_debug_info(self, success_msg, debug_info):
+        st.success(success_msg)
+
+        with st.expander("View Details", expanded=False):
+            st.write("Debug information:")
+            st.text(debug_info)
+
+    def run_summary(self):
+        summary = State.get(StateKey.FINAL_SUMMARY)
+        if summary is not None:
+            return summary[0], summary[1]
+
+        selected_detection = State.get(StateKey.SELECTED_DETECTION)
+        detection_rule, _ = State.get(StateKey.DETECTION_RULE)
+        investigation_guide, _ = State.get(StateKey.INVESTIGATION_GUIDE)
+        score, qa_review, _ = State.get(StateKey.QA_REVIEW)
+        model_params = {
+            "temperature": State.get(StateKey.MODEL_TEMPERATURE),
+            "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+        }
+
+        with st.spinner("Processing final summary..."):
+            summary, debug_info = PromptSignature.final_summary(
+                detection_description=selected_detection,
+                detection_rule=detection_rule,
+                investigation_guide=investigation_guide,
+                qa_assessment=qa_review,
+                qa_score=score,
+                model_params=model_params,
+            )
+
+        State.set(StateKey.FINAL_SUMMARY, (summary, debug_info))
+
+        return summary, debug_info
+
+
 class DetectionCreationView:
     def render(self):
         """Render the Detection Engineering tab."""
@@ -269,6 +388,8 @@ class DetectionCreationView:
             DetectionEngineeringStep.SUGGEST_DETECTION_FROM_INTEL: SuggestDetectionStepComponent(),
             DetectionEngineeringStep.GENERATE_DETECTION_RULE: GenerateRuleStepComponent(),
             DetectionEngineeringStep.DEVELOP_INVESTIGATION_PLAYBOOK: InvestigationGuideStepComponent(),
+            DetectionEngineeringStep.QA_REVIEW: QAReviewStepComponent(),
+            DetectionEngineeringStep.FINAL_SUMMARY: FinalSummaryStepComponent(),
         }
 
         for s in DETECTION_ENGINEERING_STEPS:

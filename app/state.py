@@ -59,6 +59,8 @@ class StateKey(Enum):
     SELECTED_DETECTION = "selected_detection"
     DETECTION_RULE = "detection_rule"
     INVESTIGATION_GUIDE = "investigation_guide"
+    QA_REVIEW = "qa_review"
+    FINAL_SUMMARY = "final_summary"
 
 
 class State:
@@ -79,7 +81,9 @@ class State:
             StateKey.SUGGESTED_DETECTIONS,
             StateKey.SELECTED_DETECTION,
             StateKey.DETECTION_RULE,
-            StateKey.INVESTIGATION_GUIDE
+            StateKey.INVESTIGATION_GUIDE,
+            StateKey.QA_REVIEW,
+            StateKey.FINAL_SUMMARY,
         ]
 
         for key in execution_state:

@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.12"
 streamlit = "^1.40.2"
 dspy = "^2.5.41"
+pyperclip = "^1.9.0"
 
 
 [build-system]
