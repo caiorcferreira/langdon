@@ -1,8 +1,9 @@
 import streamlit as st
 import fitz
-from .prompt import interpret_threat_intel, configure_lm
+from .prompt import suggest_detections_from_intel, configure_lm
 from streamlit.logger import get_logger
 import dspy
+from .state import StateKeys, component_key, set_state, get_state
 
 logger = get_logger(__name__)
 
@@ -39,6 +40,7 @@ def serialize_file(uploaded_file):
         # Process other text files
         return uploaded_file.getvalue().decode("utf-8")
 
+
 class DetectionCreationView:
     def __init__(self):
         self.current_step = detection_engineering_steps[0]  # todo: replace with session_state
@@ -62,15 +64,28 @@ class DetectionCreationView:
                 on_click=lambda: self.start_detection_generation(output_container),
             )
 
+
     def start_detection_generation(self, parent):
         """Start the detection generation process."""
         with parent:
             st.subheader("Step 1: Analyze Threat Intel")
             # details = st.expander("View Details", expanded=False)
 
+            threat_source = get_state(StateKeys.THREAT_SOURCE)
+            focus = get_state(StateKeys.THREAT_SOURCE_FOCUS)
+            data_source = get_state(StateKeys.DATA_SOURCE)
+            model_params = {
+                "temperature": get_state(StateKeys.MODEL_TEMPERATURE),
+                "max_tokens": get_state(StateKeys.MODEL_MAX_TOKENS),
+            }
+
             with st.spinner("Analyzing threat intelligence..."):
-                logger.info(f"Threat Source: {st.session_state["threat_source"]}")
-                detections = interpret_threat_intel(report=st.session_state["threat_source"], data_source="AWS CloudTrail Logs")
+                detections = suggest_detections_from_intel(
+                    focus=focus,
+                    report=threat_source,
+                    data_source=data_source,
+                    model_params=model_params,
+                )
 
             if not detections:
                 st.warning("No detections found for the specified data sources.")
@@ -86,6 +101,7 @@ class DetectionCreationView:
                 st.markdown(f"**Detection Name:** {detection.name}")
                 st.write(f"**Threat Behavior:** {detection.threat_behavior}")
                 st.write(f"**Log Evidence:** {detection.log_evidence}")
+                st.write(f"**MITRE ATT&CK Tactic:** {detection.mitre_tactic}")
                 st.write(f"**Context:** {detection.context}")
                 st.write("---")
 
@@ -97,8 +113,9 @@ class DetectionCreationView:
 
         with col1:
             st.text_area(
-                "Enter threat intelligence description:",
-                placeholder="Detect a user trying to steal IAM Credentials and Event Data from Lambda.",
+                "Explain your focus subject in the threat report:",
+                key=component_key(StateKeys.THREAT_SOURCE_FOCUS),
+                placeholder="Detect persistence and execution from a compromised Lambda.",
                 height=400,
             )
 
@@ -114,17 +131,17 @@ class DetectionCreationView:
             st.file_uploader(
                 "Upload file (optional):",
                 type=["txt", "pdf"],
-                key="uploaded_threat_file",
+                key=component_key(StateKeys.UPLOADED_THREAT_FILE),
                 label_visibility="visible",
                 on_change=self.update_threat_source_from_file,
             )
 
     def update_threat_source_from_file(self):
         """Update the threat source based on the uploaded file."""
-        uploaded_file = st.session_state['uploaded_threat_file']
+        uploaded_file = get_state(StateKeys.UPLOADED_THREAT_FILE)
         logger.info(f"Uploaded File: {uploaded_file}")
 
-        st.session_state["threat_source"] = serialize_file(uploaded_file)
+        set_state(StateKeys.THREAT_SOURCE, serialize_file(uploaded_file))
 
     def render_example_detections(self):
         """Render the Example Detections section."""
@@ -172,8 +189,8 @@ class DetectionEngineeringApp:
     def render_configuration_section(self):
         """Render the configuration section in the sidebar."""
         st.write("### Configuration")
-        st.selectbox("LLM Provider", ["OpenAI", "Claude", "Other"])
-        st.selectbox("Model Type", ["gpt-4o-mini", "gpt-3.5", "Claude-mini"])
+        st.selectbox("LLM Provider", ["OpenAI", "Claude", "Other"], key=component_key(StateKeys.LLM_PROVIDER))
+        st.selectbox("Model Type", ["gpt-4o-mini", "gpt-3.5", "Claude-mini"], key=component_key(StateKeys.MODEL))
         st.multiselect(
             "Security Data/Log Type(s)",
             [
@@ -182,10 +199,29 @@ class DetectionEngineeringApp:
                 "GCP Audit Logs",
             ],
             default=["AWS CloudTrail Logs"],
+            key=component_key(StateKeys.DATA_SOURCE),
         )
         st.selectbox(
             "Detection Language",
             ["Hunters (Snowflake SQL)", "KQL", "SQL"],
+            key=component_key(StateKeys.DETECTION_LANG),
+        )
+
+        st.write("### Model Parameters")
+        st.slider(
+            "Temperature",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.5,
+            step=0.01,
+            key=component_key(StateKeys.MODEL_TEMPERATURE),
+        )
+        st.number_input(
+            "Max Tokens",
+            min_value=1,
+            max_value=4096,
+            value=4096,
+            key=component_key(StateKeys.MODEL_MAX_TOKENS),
         )
 
     def render_main_header(self):
