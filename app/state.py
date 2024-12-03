@@ -41,6 +41,9 @@ class StateKey(Enum):
     DATA_SOURCE = "data_source"
     DETECTION_LANG = "detection_lang"
 
+    DETECTION_STEPS = "detection_steps"
+    TRIAGE_STEPS = "triage_steps"
+
     DETECTION_ENG_CURRENT_STEP = "detection_eng_current_step"
 
     THREAT_SOURCE = "threat_source"
@@ -49,8 +52,12 @@ class StateKey(Enum):
     SUGGESTED_DETECTIONS = "suggested_detections"
     SELECTED_DETECTION = "selected_detection"
 
+    DETECTION_RULE = "detection_rule"
+
     EXAMPLE_DETECTIONS = "example_detections"
     EXAMPLE_LOGS = "example_logs"
+
+
 
 
 class State:

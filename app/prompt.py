@@ -1,8 +1,8 @@
 import dspy
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 import os
-
+from dspy.utils.callback import BaseCallback
 
 class Detection(BaseModel):
     name: str = Field(description="detection rule concise name")
@@ -91,19 +91,22 @@ Ensure that:
 
 class PromptSignature:
     @staticmethod
-    def create_detection_rule(detection_description: Detection, detection_language: str, example_logs: list[str], detection_steps: Optional[str], model_params: dict) -> DetectionRule:
+    def create_detection_rule(detection_description: Detection, detection_language: str, example_logs: list[str], detection_steps: Optional[str], model_params: dict):
         """Create a detection rule based on the provided detection description."""
         configure_lm("openai")
 
-        predictor = dspy.ChainOfThought(CreateDetectionRule, **model_params)
+        logging_callback = ModuleLoggingCallback()
+
+        predictor = dspy.ChainOfThought(CreateDetectionRule, callbacks=[logging_callback], **model_params)
         output = predictor(
             detection_description=detection_description,
             detection_language=detection_language,
             example_logs=example_logs,
             detection_steps=detection_steps,
         )
+        rendered_prompt = logging_callback.history
 
-        return output.detection_rule
+        return output.detection_rule, rendered_prompt
 
     @staticmethod
     def suggest_detections_from_intel(focus: str, report: str, data_source: str, model_params: dict) -> list[Detection]:
@@ -115,6 +118,29 @@ class PromptSignature:
 
         return output.suggested_detections
 
+
+class ModuleLoggingCallback(BaseCallback):
+    def __init__(self):
+        self.history = ""
+
+    def on_lm_start(self, call_id, instance, inputs):
+        self.history += "Input prompt:\n"
+        for k, v in inputs.items():
+            self.history += f"{k}: {v}\n"
+
+        self.history += "\n"
+
+    def on_module_end(
+        self,
+        call_id: str,
+        outputs: Optional[Any],
+        exception: Optional[Exception] = None,
+    ):
+        self.history += "Response:\n"
+        for k, v in outputs.items():
+            self.history += f"{k}: {v}\n"
+
+        self.history += "\n"
 
 
 def configure_lm(provider: Literal["genplat", "openai"]):

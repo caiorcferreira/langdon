@@ -1,6 +1,6 @@
 import streamlit as st
 import fitz
-from app.prompt import suggest_detections_from_intel
+from app.prompt import suggest_detections_from_intel, PromptSignature
 from streamlit.logger import get_logger
 from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS, DetectionEngineeringStep
 from .components import line_separator
@@ -98,25 +98,68 @@ class SuggestDetectionStepComponent:
 
         selected_detection_name = st.selectbox("Select a detection to process:", [d.name for d in detections])
 
-        if st.button("Process Selected Detection", type="primary", key="process_selected_detection"):
+        if st.button("Process Selected Detection", type="primary", disabled=State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.SUGGEST_DETECTION_FROM_INTEL):
             logger.info("Processing selected detection")
             selected_detection = next(d for d in detections if d.name == selected_detection_name)
 
-            State.set(StateKey.SELECTED_DETECTION, selected_detection)
+            line_separator()
+            st.write("Processing the selected detection:")
+            details = DetectionDetailComponent(selected_detection)
+            details.render()
 
+            State.set(StateKey.SELECTED_DETECTION, selected_detection)
             State.advance_detection_engineering_step()
+
             st.rerun()
 
 
 class GenerateRuleStepComponent:
     def render(self):
-        selected_detection = State.get(StateKey.SELECTED_DETECTION)
+        """Render the Suggest Detection step."""
+        logger.info("Rendering generate rule")
+        st.subheader("Step 2: Create Detection Rule")
+        # details = st.expander("View Details", expanded=False)
 
-        st.write("Processing the selected detection:")
-        details = DetectionDetailComponent(selected_detection)
-        details.render()
+        _, debug_info = self.run_create_rule()
+        self.render_detection_rule(debug_info)
 
-        line_separator()
+    def render_detection_rule(self, debug_info):
+        st.success("Create detection rule complete!")
+
+        with st.expander("View Details", expanded=False):
+            st.write("Debug information:")
+            st.text(debug_info)
+
+    def run_create_rule(self):
+        created_detection = State.get(StateKey.DETECTION_RULE)
+        if created_detection is not None:
+            return created_detection[0], created_detection[1]
+
+        detection = State.get(StateKey.SELECTED_DETECTION)
+        if detection is None:
+            return
+
+        detection_lang = State.get(StateKey.DETECTION_LANG)
+        example_logs = State.get(StateKey.EXAMPLE_LOGS)
+        detection_steps = State.get(StateKey.DETECTION_STEPS)
+        model_params = {
+            "temperature": State.get(StateKey.MODEL_TEMPERATURE),
+            "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+        }
+
+        with st.spinner("Processing rule creation..."):
+            detection_rule, debug_info = PromptSignature.create_detection_rule(
+                detection_description=detection,
+                detection_language=detection_lang,
+                example_logs=example_logs,
+                detection_steps=detection_steps,
+                model_params=model_params,
+            )
+
+        State.set(StateKey.DETECTION_RULE, (detection_rule, debug_info))
+        State.advance_detection_engineering_step()
+
+        return detection_rule, debug_info
 
 
 class DetectionCreationView:
@@ -126,6 +169,8 @@ class DetectionCreationView:
         self.render_progress()
 
         self.render_threat_intelligence_input()
+        self.render_prompt_customization()
+
         line_separator()
         self.render_example_detections()
         line_separator()
@@ -137,7 +182,8 @@ class DetectionCreationView:
             st.button(
                 "Start detection generation",
                 type="primary",
-                on_click=self.start_detection_generation
+                on_click=self.start_detection_generation,
+                disabled=State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.INIT,
             )
 
             self.render_output()
@@ -176,7 +222,7 @@ class DetectionCreationView:
 
     def render_threat_intelligence_input(self):
         """Render the Threat Intelligence Input section."""
-        st.subheader("Threat Intelligence Input")
+        st.subheader("Threat Intelligence")
         col1, col2 = st.columns([1, 1])
 
         with col1:
@@ -205,7 +251,25 @@ class DetectionCreationView:
             )
 
 
+    def render_prompt_customization(self):
+        st.write("**Prompt customization**")
+        with st.expander("Detection Steps", expanded=False):
+            st.text_area(
+                "Enter detection implementation steps:",
+                height=150,
+                placeholder="1. Identify the key indicators or behaviors from the threat intel\n2. Determine the relevant log sources and fields\n3. Write the query using the specified detection language\n4. Include appropriate filtering to reduce false positives\n5. Add comments to explain the logic of the detection",
+                help="Outline the steps you typically follow when writing detection rules.",
+                key=State.component_key(StateKey.DETECTION_STEPS),
+            )
 
+        with st.expander("Alert Triage Steps", expanded=False):
+            st.text_area(
+                "Enter standard operating procedures or investigation steps for your current detections and alerts:",
+                height=150,
+                placeholder="1. Validate the alert by reviewing the raw log data\n2. Check for any related alerts or suspicious activities from the same source\n3. Investigate the affected systems and user accounts\n4. Determine the potential impact and scope of the incident\n5. Escalate to the incident response team if a true positive is confirmed",
+                help="Describe your standard operating procedures for triaging and investigating alerts.",
+                key=State.component_key(StateKey.TRIAGE_STEPS),
+            )
 
     def update_threat_source_from_file(self):
         """Update the threat source based on the uploaded file."""
