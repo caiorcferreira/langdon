@@ -102,7 +102,9 @@ class SuggestDetectionStepComponent:
 
         selected_detection_name = st.selectbox("Select a detection to process:", [d.name for d in detections])
 
-        if st.button("Process Selected Detection", type="primary", disabled=State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.SUGGEST_DETECTION_FROM_INTEL):
+        disable_selection = not State.get(StateKey.DETECTION_ENG_CURRENT_STEP) in [DetectionEngineeringStep.SUGGEST_DETECTION_FROM_INTEL, DetectionEngineeringStep.FINAL_SUMMARY]
+
+        if st.button("Process Selected Detection", type="primary", disabled=disable_selection):
             logger.info("Processing selected detection")
             selected_detection = next(d for d in detections if d.name == selected_detection_name)
 
