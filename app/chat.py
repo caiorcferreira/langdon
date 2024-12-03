@@ -3,23 +3,10 @@ import fitz
 from .prompt import suggest_detections_from_intel, configure_lm
 from streamlit.logger import get_logger
 import dspy
-from .state import StateKeys, component_key, set_state, get_state
+from .state import StateKey, component_key, set_state, get_state, DETECTION_ENGINEERING_STEPS
 
 logger = get_logger(__name__)
 
-INTERPRET_THREAT_INTEL = "interpret_threat_intel"
-GENERATE_DETECTION_RULE = "generate_detection_rule"
-DEVELOP_INVESTIGATION_PLAYBOOK = "develop_investigation_playbook"
-QA_REVIEW = "qa_review"
-FINAL_SUMMARY = "final_summary"
-
-detection_engineering_steps = [
-    INTERPRET_THREAT_INTEL,
-    GENERATE_DETECTION_RULE,
-    DEVELOP_INVESTIGATION_PLAYBOOK,
-    QA_REVIEW,
-    FINAL_SUMMARY,
-]
 
 def line_separator():
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -42,12 +29,10 @@ def serialize_file(uploaded_file):
 
 
 class DetectionCreationView:
-    def __init__(self):
-        self.current_step = detection_engineering_steps[0]  # todo: replace with session_state
-
     def render(self):
         """Render the Detection Engineering tab."""
-        st.progress(6 / 6, text="Current Step: 5/5")
+        self.render_progress()
+
         self.render_threat_intelligence_input()
         line_separator()
         self.render_example_detections()
@@ -71,12 +56,12 @@ class DetectionCreationView:
             st.subheader("Step 1: Analyze Threat Intel")
             # details = st.expander("View Details", expanded=False)
 
-            threat_source = get_state(StateKeys.THREAT_SOURCE)
-            focus = get_state(StateKeys.THREAT_SOURCE_FOCUS)
-            data_source = get_state(StateKeys.DATA_SOURCE)
+            threat_source = get_state(StateKey.THREAT_SOURCE)
+            focus = get_state(StateKey.THREAT_SOURCE_FOCUS)
+            data_source = get_state(StateKey.DATA_SOURCE)
             model_params = {
-                "temperature": get_state(StateKeys.MODEL_TEMPERATURE),
-                "max_tokens": get_state(StateKeys.MODEL_MAX_TOKENS),
+                "temperature": get_state(StateKey.MODEL_TEMPERATURE),
+                "max_tokens": get_state(StateKey.MODEL_MAX_TOKENS),
             }
 
             with st.spinner("Analyzing threat intelligence..."):
@@ -91,6 +76,7 @@ class DetectionCreationView:
                 st.warning("No detections found for the specified data sources.")
                 return
 
+            set_state(StateKey.SUGGESTED_DETECTIONS, detections)
             st.success("Analysis complete!")
 
             # Display the number of detections found
@@ -105,6 +91,15 @@ class DetectionCreationView:
                 st.write(f"**Context:** {detection.context}")
                 st.write("---")
 
+        set_state(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[1])
+
+    def render_progress(self):
+        current_step = get_state(StateKey.DETECTION_ENG_CURRENT_STEP)
+        step_index = DETECTION_ENGINEERING_STEPS.index(current_step) + 1
+        total = len(DETECTION_ENGINEERING_STEPS)
+
+        st.progress(step_index / total,
+                    text=f"Current Step: {step_index}/{total}")
 
     def render_threat_intelligence_input(self):
         """Render the Threat Intelligence Input section."""
@@ -114,7 +109,7 @@ class DetectionCreationView:
         with col1:
             st.text_area(
                 "Explain your focus subject in the threat report:",
-                key=component_key(StateKeys.THREAT_SOURCE_FOCUS),
+                key=component_key(StateKey.THREAT_SOURCE_FOCUS),
                 placeholder="Detect persistence and execution from a compromised Lambda.",
                 height=400,
             )
@@ -131,17 +126,17 @@ class DetectionCreationView:
             st.file_uploader(
                 "Upload file (optional):",
                 type=["txt", "pdf"],
-                key=component_key(StateKeys.UPLOADED_THREAT_FILE),
+                key=component_key(StateKey.UPLOADED_THREAT_FILE),
                 label_visibility="visible",
                 on_change=self.update_threat_source_from_file,
             )
 
     def update_threat_source_from_file(self):
         """Update the threat source based on the uploaded file."""
-        uploaded_file = get_state(StateKeys.UPLOADED_THREAT_FILE)
+        uploaded_file = get_state(StateKey.UPLOADED_THREAT_FILE)
         logger.info(f"Uploaded File: {uploaded_file}")
 
-        set_state(StateKeys.THREAT_SOURCE, serialize_file(uploaded_file))
+        set_state(StateKey.THREAT_SOURCE, serialize_file(uploaded_file))
 
     def render_example_detections(self):
         """Render the Example Detections section."""
@@ -189,8 +184,8 @@ class DetectionEngineeringApp:
     def render_configuration_section(self):
         """Render the configuration section in the sidebar."""
         st.write("### Configuration")
-        st.selectbox("LLM Provider", ["OpenAI", "Claude", "Other"], key=component_key(StateKeys.LLM_PROVIDER))
-        st.selectbox("Model Type", ["gpt-4o-mini", "gpt-3.5", "Claude-mini"], key=component_key(StateKeys.MODEL))
+        st.selectbox("LLM Provider", ["OpenAI", "Claude", "Other"], key=component_key(StateKey.LLM_PROVIDER))
+        st.selectbox("Model Type", ["gpt-4o-mini", "gpt-3.5", "Claude-mini"], key=component_key(StateKey.MODEL))
         st.multiselect(
             "Security Data/Log Type(s)",
             [
@@ -199,12 +194,12 @@ class DetectionEngineeringApp:
                 "GCP Audit Logs",
             ],
             default=["AWS CloudTrail Logs"],
-            key=component_key(StateKeys.DATA_SOURCE),
+            key=component_key(StateKey.DATA_SOURCE),
         )
         st.selectbox(
             "Detection Language",
             ["Hunters (Snowflake SQL)", "KQL", "SQL"],
-            key=component_key(StateKeys.DETECTION_LANG),
+            key=component_key(StateKey.DETECTION_LANG),
         )
 
         st.write("### Model Parameters")
@@ -214,14 +209,14 @@ class DetectionEngineeringApp:
             max_value=1.0,
             value=0.5,
             step=0.01,
-            key=component_key(StateKeys.MODEL_TEMPERATURE),
+            key=component_key(StateKey.MODEL_TEMPERATURE),
         )
         st.number_input(
             "Max Tokens",
             min_value=1,
             max_value=4096,
             value=4096,
-            key=component_key(StateKeys.MODEL_MAX_TOKENS),
+            key=component_key(StateKey.MODEL_MAX_TOKENS),
         )
 
     def render_main_header(self):
@@ -245,6 +240,7 @@ class DetectionEngineeringApp:
     def render(self):
         """Main function to render the Streamlit app."""
         self.configure_page()
+        set_state(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
 
         self.render_sidebar()
         self.render_main_header()
