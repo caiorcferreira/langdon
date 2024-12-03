@@ -52,12 +52,11 @@ class StateKey(Enum):
     SUGGESTED_DETECTIONS = "suggested_detections"
     SELECTED_DETECTION = "selected_detection"
 
-    DETECTION_RULE = "detection_rule"
-
     EXAMPLE_DETECTIONS = "example_detections"
     EXAMPLE_LOGS = "example_logs"
 
-
+    DETECTION_RULE = "detection_rule"
+    INVESTIGATION_GUIDE = "investigation_guide"
 
 
 class State:
@@ -106,3 +105,23 @@ class State:
     @staticmethod
     def has(key: StateKey) -> bool:
         return key.value in st.session_state
+
+
+def step_update_transaction():
+    return StepUpdateTransaction()
+
+
+class StepUpdateTransaction:
+    def __init__(self):
+        self.step_before = None
+
+    def __enter__(self):
+        self.step_before = State.get(StateKey.DETECTION_ENG_CURRENT_STEP)
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != self.step_before:
+            st.rerun()
+
+        return False

@@ -2,7 +2,7 @@ import streamlit as st
 import fitz
 from app.prompt import suggest_detections_from_intel, PromptSignature
 from streamlit.logger import get_logger
-from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS, DetectionEngineeringStep
+from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS, DetectionEngineeringStep, step_update_transaction
 from .components import line_separator
 
 logger = get_logger(__name__)
@@ -43,12 +43,13 @@ class SuggestDetectionStepComponent:
         """Render the Suggest Detection step."""
         logger.info("Rendering Suggest Detection step")
         st.subheader("Step 1: Analyze Threat Intel")
-        # details = st.expander("View Details", expanded=False)
 
         detections = self.run_analysis()
 
         self.render_detection_list(detections)
-        self.render_detection_selection()
+
+        with step_update_transaction():
+            self.render_detection_selection()
 
     def run_analysis(self):
         detections = State.get(StateKey.SUGGESTED_DETECTIONS)
@@ -110,18 +111,16 @@ class SuggestDetectionStepComponent:
             State.set(StateKey.SELECTED_DETECTION, selected_detection)
             State.advance_detection_engineering_step()
 
-            st.rerun()
-
 
 class GenerateRuleStepComponent:
     def render(self):
-        """Render the Suggest Detection step."""
+        """Render the Generate Rule step."""
         logger.info("Rendering generate rule")
         st.subheader("Step 2: Create Detection Rule")
-        # details = st.expander("View Details", expanded=False)
 
-        _, debug_info = self.run_create_rule()
-        self.render_detection_rule(debug_info)
+        with step_update_transaction():
+            _, debug_info = self.run_create_rule()
+            self.render_detection_rule(debug_info)
 
     def render_detection_rule(self, debug_info):
         st.success("Create detection rule complete!")
@@ -162,10 +161,54 @@ class GenerateRuleStepComponent:
         return detection_rule, debug_info
 
 
+class InvestigationGuideStepComponent:
+    def render(self):
+        """Render the Investigation Guide step."""
+        logger.info("Rendering investigation guide")
+        st.subheader("Step 3: Develop Investigation Guide")
+
+        with step_update_transaction():
+            _, debug_info = self.run_develop_guide()
+            self.render_debug_info(success_msg="Develop Investigation Guide complete!", debug_info=debug_info)
+
+    def render_debug_info(self, success_msg, debug_info):
+        st.success(success_msg)
+
+        with st.expander("View Details", expanded=False):
+            st.write("Debug information:")
+            st.text(debug_info)
+
+    def run_develop_guide(self):
+        guide = State.get(StateKey.INVESTIGATION_GUIDE)
+        if guide is not None:
+            return guide[0], guide[1]
+
+        detection_rule, _ = State.get(StateKey.DETECTION_RULE)
+        if detection_rule is None:
+            return
+
+        triage_steps = State.get(StateKey.TRIAGE_STEPS)
+        model_params = {
+            "temperature": State.get(StateKey.MODEL_TEMPERATURE),
+            "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+        }
+
+        with st.spinner("Processing rule creation..."):
+            investigation_guide, debug_info = PromptSignature.develop_investigation_guide(
+                detection_rule=detection_rule,
+                standard_op_procedure=triage_steps,
+                model_params=model_params,
+            )
+
+        State.set(StateKey.INVESTIGATION_GUIDE, (investigation_guide, debug_info))
+        State.advance_detection_engineering_step()
+
+        return investigation_guide, debug_info
+
+
 class DetectionCreationView:
     def render(self):
         """Render the Detection Engineering tab."""
-        logger.info("rerendering")
         self.render_progress()
 
         self.render_threat_intelligence_input()
@@ -199,6 +242,7 @@ class DetectionCreationView:
         step_render = {
             DetectionEngineeringStep.SUGGEST_DETECTION_FROM_INTEL: SuggestDetectionStepComponent(),
             DetectionEngineeringStep.GENERATE_DETECTION_RULE: GenerateRuleStepComponent(),
+            DetectionEngineeringStep.DEVELOP_INVESTIGATION_PLAYBOOK: InvestigationGuideStepComponent(),
         }
 
         for s in DETECTION_ENGINEERING_STEPS:

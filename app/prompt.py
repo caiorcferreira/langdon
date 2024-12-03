@@ -82,6 +82,7 @@ Ensure that:
 - Ensure your response is clear, professional, and free of errors.
 """
     detection_description: Detection = dspy.InputField(desc="description of the detection rule to be created")
+    # todo: add example detections
     detection_language: str = dspy.InputField(desc="detection language to write the detection rule in")
     example_logs: list[str] = dspy.InputField(desc="example logs showing the structure of log data or events")
     detection_steps: Optional[str] = dspy.InputField(desc="outline the steps typically followed when writing detection rules (optional)")
@@ -89,7 +90,55 @@ Ensure that:
     detection_rule: DetectionRule = dspy.OutputField(desc="complete detection rule with code, logic, limitations, and false positive rate")
 
 
+class DevelopInvestigationGuide(dspy.Signature):
+    """# ROLE AND PURPOSE
+You are an experienced SOC analyst specialized in creating detailed investigation guides for detection rules. Your task is to create an investigation guide based on the provided detection rule and other inputs.
+
+Ensure that:
+- The investigation guide follows Palantir's alert and detection strategy framework.
+- The guide incorporates elements from the provided standard operating procedure (SOP), if available.
+- The guide includes clear, concise, and actionable steps.
+
+# STEPS
+1. **Review the Detection Rule and SOP**
+    - Carefully read the detection rule enclosed given as input.
+    - If a standard operating procedure is provided, read it carefully.
+
+2. **Develop the Investigation Guide**
+    - Create an investigation guide that includes:
+        1. Initial triage steps to quickly assess the alert's validity.
+        2. Detailed investigation procedures, including specific queries or commands.
+        3. Criteria for escalation or closure of the alert.
+        4. Potential related TTPs or lateral movements to look for.
+        5. Recommended containment or mitigation actions.
+    - Incorporate elements from Palantir's alert and detection strategy framework.
+    - Include relevant elements from the SOP, if provided.
+
+3. **Format the Guide**
+    - Present the guide as a numbered list with clear, concise, and actionable steps.
+    - Include any caveats, limitations, or decision points an analyst might encounter.
+
+# ADDITIONAL INSTRUCTIONS
+- If you cannot write a complete investigation guide, explain why and specify the missing information.
+- Ensure your response is clear, professional, and free of errors.
+- Return only the investigation guide, no comments.
+"""
+    detection_rule: DetectionRule = dspy.InputField(desc="description of the detection rule to be created")
+    example_standard_operation_procedure: str = dspy.InputField(desc="example standard operation procedure showing the format and style of an investigation guide.")
+    investigation_guide: str = dspy.OutputField(desc="investigation guide to triage and investigate detection rule alerts")
+
+
 class PromptSignature:
+    @staticmethod
+    def suggest_detections_from_intel(focus: str, report: str, data_source: str, model_params: dict) -> list[Detection]:
+        """Interpret the threat intelligence report and extract potential detections."""
+        configure_lm("openai")
+
+        predictor = dspy.ChainOfThought(SuggestDetectionFromIntel, **model_params)
+        output = predictor(focus=focus, report=report, data_source=data_source)
+
+        return output.suggested_detections
+
     @staticmethod
     def create_detection_rule(detection_description: Detection, detection_language: str, example_logs: list[str], detection_steps: Optional[str], model_params: dict):
         """Create a detection rule based on the provided detection description."""
@@ -109,14 +158,20 @@ class PromptSignature:
         return output.detection_rule, rendered_prompt
 
     @staticmethod
-    def suggest_detections_from_intel(focus: str, report: str, data_source: str, model_params: dict) -> list[Detection]:
-        """Interpret the threat intelligence report and extract potential detections."""
+    def develop_investigation_guide(detection_rule: DetectionRule, standard_op_procedure: Optional[str], model_params: dict):
         configure_lm("openai")
 
-        predictor = dspy.ChainOfThought(SuggestDetectionFromIntel, **model_params)
-        output = predictor(focus=focus, report=report, data_source=data_source)
+        logging_callback = ModuleLoggingCallback()
 
-        return output.suggested_detections
+        predictor = dspy.ChainOfThought(DevelopInvestigationGuide, callbacks=[logging_callback], **model_params)
+        output = predictor(
+            detection_rule=detection_rule,
+            example_standard_operation_procedure=standard_op_procedure,
+        )
+        rendered_prompt = logging_callback.history
+
+        return output.investigation_guide, rendered_prompt
+
 
 
 class ModuleLoggingCallback(BaseCallback):
