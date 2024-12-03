@@ -50,12 +50,13 @@ class StateKey(Enum):
     THREAT_SOURCE = "threat_source"
     THREAT_SOURCE_FOCUS = "threat_source_focus"
     UPLOADED_THREAT_FILE = "uploaded_threat_file"
-    SUGGESTED_DETECTIONS = "suggested_detections"
-    SELECTED_DETECTION = "selected_detection"
 
     EXAMPLE_DETECTIONS = "example_detections"
     EXAMPLE_LOGS = "example_logs"
 
+    # Execution specific state keys. These should be reset when restarting the execution.
+    SUGGESTED_DETECTIONS = "suggested_detections"
+    SELECTED_DETECTION = "selected_detection"
     DETECTION_RULE = "detection_rule"
     INVESTIGATION_GUIDE = "investigation_guide"
 

@@ -1,6 +1,6 @@
 import streamlit as st
 import fitz
-from app.prompt import suggest_detections_from_intel, PromptSignature
+from app.prompt import PromptSignature
 from streamlit.logger import get_logger
 from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS, DetectionEngineeringStep, step_update_transaction
 from .components import line_separator
@@ -42,6 +42,7 @@ class SuggestDetectionStepComponent:
     def render(self):
         """Render the Suggest Detection step."""
         logger.info("Rendering Suggest Detection step")
+
         st.subheader("Step 1: Analyze Threat Intel")
 
         # todo: do not run without file or scrape link / and focus
@@ -228,10 +229,20 @@ class DetectionCreationView:
         output_container = st.container()
         with output_container:
             line_separator()
+
+            # this guard clause would be better inside the SuggestDetectionStepComponent.run_analysis method
+            # but due to the imperative nature of streamlit, it lives here.
+            threat_source = State.get(StateKey.THREAT_SOURCE)
+            focus = State.get(StateKey.THREAT_SOURCE_FOCUS)
+
+            disable_start_button = State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.INIT or \
+                threat_source is None or \
+                focus is None
+
             if st.button(
                 "Start detection generation",
                 type="primary",
-                disabled=State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.INIT,
+                disabled=disable_start_button,
             ):
                 State.advance_detection_engineering_step()
                 st.rerun()
