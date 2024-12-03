@@ -52,6 +52,7 @@ class SuggestDetectionStepComponent:
 
         with step_update_transaction():
             self.render_detection_selection()
+            self.render_selected_detection()
 
     def run_analysis(self):
         detections = State.get(StateKey.SUGGESTED_DETECTIONS)
@@ -105,13 +106,18 @@ class SuggestDetectionStepComponent:
             logger.info("Processing selected detection")
             selected_detection = next(d for d in detections if d.name == selected_detection_name)
 
-            line_separator()
-            st.write("Processing the selected detection:")
-            details = DetectionDetailComponent(selected_detection)
-            details.render()
-
             State.set(StateKey.SELECTED_DETECTION, selected_detection)
             State.advance_detection_engineering_step()
+
+    def render_selected_detection(self):
+        selected_detection = State.get(StateKey.SELECTED_DETECTION)
+        if selected_detection is None:
+            return
+
+        st.write("Processing the selected detection:")
+        details = DetectionDetailComponent(selected_detection)
+        details.render()
+        line_separator()
 
 
 class GenerateRuleStepComponent:
