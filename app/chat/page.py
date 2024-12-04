@@ -14,14 +14,14 @@ class DetectionEngineeringPage:
             page_title=" Detection Engeneering",
             page_icon="",
             layout="wide",
+            initial_sidebar_state="collapsed",
         )
 
     def render_sidebar(self):
         """Render the sidebar with configuration and links."""
         with st.sidebar:
-            st.markdown("""""")
-            st.write("## Quick Start Guide")
-            st.expander("Quick Start Guide")
+            st.header("Langdon")
+            st.write(" Detection Engineering engine powered by LLM.")
 
             self.render_configuration_section()
 
@@ -39,15 +39,32 @@ class DetectionEngineeringPage:
             "Security Data/Log Type(s)",
             [
                 "AWS CloudTrail Logs",
-                "Azure Monitor Logs",
                 "GCP Audit Logs",
+                "Azure Monitor Logs",
+                "Kubernetes Audit Logs",
+                "GitLab Audit Logs",
+                "AWS EKS Plane logs",
+                "Cisco Duo Logs",
+                "Okta Logs",
             ],
             default=["AWS CloudTrail Logs"],
             key=State.component_key(StateKey.DATA_SOURCE),
         )
         st.selectbox(
             "Detection Language",
-            ["Hunters (Snowflake SQL)", "KQL", "SQL"],
+            [
+                "Databricks PySpark",
+                "Databricks SQL",
+                "AWS Athena",
+                "StreamAlert",
+                "Splunk SPL",
+                "Falcon LogScale",
+                "Elastic Query DSL",
+                "Kusto Query Language (KQL)",
+                "Sigma Rules",
+                "Panther (Python)",
+                "Hunters (Snowflake SQL)",
+            ],
             key=State.component_key(StateKey.DETECTION_LANG),
         )
 
@@ -71,7 +88,7 @@ class DetectionEngineeringPage:
     def render_main_header(self):
         """Render the main header with app title and subtitle."""
         st.markdown(
-            "<h1 style='text-align: center;'> Detection Engineering</h1>",
+            "<h1 style='text-align: center;'>Langdon</h1>",
             unsafe_allow_html=True,
         )
         st.markdown(
@@ -91,9 +108,7 @@ class DetectionEngineeringPage:
         self.configure_page()
         self.render_sidebar()
         self.render_main_header()
-        # tabs = self.render_tabs()
 
         detection_tab = DetectionCreationView()
 
-        # with tabs[0]:
         detection_tab.render()
