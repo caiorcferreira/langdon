@@ -123,12 +123,12 @@ class State:
             st.error("No more steps to advance to.")
 
     @staticmethod
-    def get(key: StateKey | str):
+    def get(key: StateKey | str, default=None):
         key_val = key
         if isinstance(key, StateKey):
             key_val = key.value
 
-        return st.session_state.get(key_val, None)
+        return st.session_state.get(key_val, default)
 
     @staticmethod
     def has(key: StateKey | str) -> bool:

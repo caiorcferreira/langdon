@@ -1,7 +1,6 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import fitz
-from app.prompt import PromptSignature
+from app.llm.prompt import PromptSignature
 from streamlit.logger import get_logger
 from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS, DetectionEngineeringStep, step_update_transaction
 from .components import line_separator
@@ -67,6 +66,8 @@ class SuggestDetectionStepComponent:
         model_params = {
             "temperature": State.get(StateKey.MODEL_TEMPERATURE),
             "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+            "llm_provider": State.get(StateKey.LLM_PROVIDER),
+            "model": State.get(StateKey.MODEL),
         }
 
         with st.spinner("Analyzing threat intelligence..."):
@@ -160,6 +161,8 @@ class GenerateRuleStepComponent:
         model_params = {
             "temperature": State.get(StateKey.MODEL_TEMPERATURE),
             "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+            "llm_provider": State.get(StateKey.LLM_PROVIDER),
+            "model": State.get(StateKey.MODEL),
         }
 
         with st.spinner("Processing rule creation..."):
@@ -208,6 +211,8 @@ class InvestigationGuideStepComponent:
         model_params = {
             "temperature": State.get(StateKey.MODEL_TEMPERATURE),
             "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+            "llm_provider": State.get(StateKey.LLM_PROVIDER),
+            "model": State.get(StateKey.MODEL),
         }
 
         with st.spinner("Processing rule creation..."):
@@ -250,6 +255,8 @@ class QAReviewStepComponent:
         model_params = {
             "temperature": State.get(StateKey.MODEL_TEMPERATURE),
             "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+            "llm_provider": State.get(StateKey.LLM_PROVIDER),
+            "model": State.get(StateKey.MODEL),
         }
 
         with st.spinner("Processing QA assessment..."):
@@ -289,19 +296,6 @@ class FinalSummaryStepComponent:
             State.reset()
 
         if st.button("Copy final summary to clipboard", type="primary", key="bottom_summary_copy"):
-            # components.html(f"""
-            #     <script>
-            #     function copyToClipboard() {{
-            #         var text = `{summary}`;
-            #         navigator.clipboard.writeText(text).then(function() {{
-            #             console.log('Copied to clipboard successfully!');
-            #         }}, function(err) {{
-            #             console.error('Could not copy text: ', err);
-            #         }});
-            #     }}
-            #     copyToClipboard();
-            #     </script>
-            # """, height=0)
             pyperclip.copy(summary)
 
     def render_debug_info(self, success_msg, debug_info):
@@ -323,6 +317,8 @@ class FinalSummaryStepComponent:
         model_params = {
             "temperature": State.get(StateKey.MODEL_TEMPERATURE),
             "max_tokens": State.get(StateKey.MODEL_MAX_TOKENS),
+            "llm_provider": State.get(StateKey.LLM_PROVIDER),
+            "model": State.get(StateKey.MODEL),
         }
 
         with st.spinner("Processing final summary..."):

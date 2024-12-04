@@ -1,7 +1,7 @@
 import dspy
 from pydantic import BaseModel, Field
 from typing import Literal, Optional, Any
-import os
+from app.llm.setup import configure_lm
 from dspy.utils.callback import BaseCallback
 
 class Detection(BaseModel):
@@ -249,92 +249,103 @@ class PromptSignature:
     @staticmethod
     def suggest_detections_from_intel(focus: str, report: str, data_source: str, model_params: dict) -> list[Detection]:
         """Interpret the threat intelligence report and extract potential detections."""
-        configure_lm("openai")
+        llm_ctx, model_params = PromptSignature.llm_context(model_params)
+        with llm_ctx:
+            predictor = dspy.ChainOfThought(SuggestDetectionFromIntel, **model_params)
+            output = predictor(focus=focus, report=report, data_source=data_source)
 
-        predictor = dspy.ChainOfThought(SuggestDetectionFromIntel, **model_params)
-        output = predictor(focus=focus, report=report, data_source=data_source)
-
-        dspy.inspect_history(n=1)
+            dspy.inspect_history(n=1)
 
         return output.suggested_detections
 
     @staticmethod
     def create_detection_rule(detection_description: Detection, detection_language: str, example_logs: list[str], example_detections: list[str], detection_steps: Optional[str], model_params: dict):
         """Create a detection rule based on the provided detection description."""
-        configure_lm("openai")
-
         logging_callback = ModuleLoggingCallback()
 
-        predictor = dspy.ChainOfThought(CreateDetectionRule, callbacks=[logging_callback], **model_params)
-        output = predictor(
-            detection_description=detection_description,
-            detection_language=detection_language,
-            example_logs=example_logs,
-            example_detection_rules=example_detections,
-            detection_steps=detection_steps,
-        )
-        rendered_prompt = logging_callback.history
+        llm_ctx, model_params = PromptSignature.llm_context(model_params)
+        with llm_ctx:
+            predictor = dspy.ChainOfThought(CreateDetectionRule, callbacks=[logging_callback], **model_params)
+            output = predictor(
+                detection_description=detection_description,
+                detection_language=detection_language,
+                example_logs=example_logs,
+                example_detection_rules=example_detections,
+                detection_steps=detection_steps,
+            )
+            rendered_prompt = logging_callback.history
 
-        dspy.inspect_history(n=1)
+            dspy.inspect_history(n=1)
 
         return output.detection_rule, rendered_prompt
 
     @staticmethod
     def develop_investigation_guide(detection_rule: DetectionRule, standard_op_procedure: Optional[str], model_params: dict):
-        configure_lm("openai")
-
         logging_callback = ModuleLoggingCallback()
 
-        predictor = dspy.ChainOfThought(DevelopInvestigationGuide, callbacks=[logging_callback], **model_params)
-        output = predictor(
-            detection_rule=detection_rule,
-            example_standard_operation_procedure=standard_op_procedure,
-        )
-        rendered_prompt = logging_callback.history
+        llm_ctx, model_params = PromptSignature.llm_context(model_params)
+        with llm_ctx:
+            predictor = dspy.ChainOfThought(DevelopInvestigationGuide, callbacks=[logging_callback], **model_params)
+            output = predictor(
+                detection_rule=detection_rule,
+                example_standard_operation_procedure=standard_op_procedure,
+            )
+            rendered_prompt = logging_callback.history
 
-        dspy.inspect_history(n=1)
+            dspy.inspect_history(n=1)
 
         return output.investigation_guide, rendered_prompt
 
     @staticmethod
     def qa_review(detection_description: Detection, detection_rule: DetectionRule, model_params: dict):
         """Conduct a thorough and comprehensive review of a given detection rule."""
-        configure_lm("openai")
-
         logging_callback = ModuleLoggingCallback()
 
-        predictor = dspy.ChainOfThought(QAReview, callbacks=[logging_callback], **model_params)
-        output = predictor(
-            detection_description=detection_description,
-            detection_rule=detection_rule,
-        )
-        rendered_prompt = logging_callback.history
+        llm_ctx, model_params = PromptSignature.llm_context(model_params)
+        with llm_ctx:
+            predictor = dspy.ChainOfThought(QAReview, callbacks=[logging_callback], **model_params)
+            output = predictor(
+                detection_description=detection_description,
+                detection_rule=detection_rule,
+            )
+            rendered_prompt = logging_callback.history
 
-        dspy.inspect_history(n=1)
+            dspy.inspect_history(n=1)
 
         return output.score, output.assessment, rendered_prompt
 
     @staticmethod
     def final_summary(detection_description: Detection, detection_rule: DetectionRule, investigation_guide: str, qa_assessment: str, qa_score: int, model_params: dict):
         """Compile a comprehensive detection package for the security operations team."""
-        configure_lm("openai")
-
         logging_callback = ModuleLoggingCallback()
 
-        predictor = dspy.ChainOfThought(FinalSummary, callbacks=[logging_callback], **model_params)
-        output = predictor(
-            detection_description=detection_description,
-            detection_rule=detection_rule,
-            investigation_guide=investigation_guide,
-            qa_assessment=qa_assessment,
-            qa_score=qa_score,
-        )
-        rendered_prompt = logging_callback.history
+        llm_ctx, model_params = PromptSignature.llm_context(model_params)
+        with llm_ctx:
+            predictor = dspy.ChainOfThought(FinalSummary, callbacks=[logging_callback], **model_params)
+            output = predictor(
+                detection_description=detection_description,
+                detection_rule=detection_rule,
+                investigation_guide=investigation_guide,
+                qa_assessment=qa_assessment,
+                qa_score=qa_score,
+            )
+            rendered_prompt = logging_callback.history
 
-        dspy.inspect_history(n=1)
+            dspy.inspect_history(n=1)
 
         return output.final_summary, rendered_prompt
 
+    @staticmethod
+    def llm_context(model_params: dict):
+        provider = model_params["llm_provider"]
+        model = model_params["model"]
+
+        lm = configure_lm(provider, model)
+
+        del model_params["llm_provider"]
+        del model_params["model"]
+
+        return dspy.context(lm=lm), model_params
 
 
 class ModuleLoggingCallback(BaseCallback):
@@ -361,31 +372,31 @@ class ModuleLoggingCallback(BaseCallback):
         self.history += "\n"
 
 
-def configure_lm(provider: Literal["genplat", "openai"]):
-    if provider == "genplat":
-        print("Using GenPlat")
-
-        default_headers = {
-            'x-requester-token': os.getenv('GENPLAT_API_KEY')
-        }
-
-        lm = dspy.LM(
-            model='openai/gpt-3.5-turbo-1106',
-            api_base=os.getenv('GENPLAT_BASE_URL'),
-            api_key="dummy",
-            extra_headers=default_headers
-        )
-
-    elif provider == "openai":
-        print("Using OpenAI")
-
-        lm = dspy.LM(
-            model='openai/gpt-4o-mini',
-            api_key=os.getenv('OPENAI_API_KEY')
-        )
-    else:
-        raise ValueError("Invalid provider")
-
-    dspy.configure(lm=lm)
-
-    return lm
+# def configure_lm(provider: Literal["genplat", "openai"]):
+#     if provider == "genplat":
+#         print("Using GenPlat")
+#
+#         default_headers = {
+#             'x-requester-token': os.getenv('GENPLAT_API_KEY')
+#         }
+#
+#         lm = dspy.LM(
+#             model='openai/gpt-3.5-turbo-1106',
+#             api_base=os.getenv('GENPLAT_BASE_URL'),
+#             api_key="dummy",
+#             extra_headers=default_headers
+#         )
+#
+#     elif provider == "openai":
+#         print("Using OpenAI")
+#
+#         lm = dspy.LM(
+#             model='openai/gpt-4o-mini',
+#             api_key=os.getenv('OPENAI_API_KEY')
+#         )
+#     else:
+#         raise ValueError("Invalid provider")
+#
+#     dspy.configure(lm=lm)
+#
+#     return lm

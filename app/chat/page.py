@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit.logger import get_logger
 from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS
 from .detection import DetectionCreationView
+from app.llm.setup import PROVIDERS, MODELS
 
 logger = get_logger(__name__)
 
@@ -26,9 +27,14 @@ class DetectionEngineeringPage:
 
     def render_configuration_section(self):
         """Render the configuration section in the sidebar."""
+        llm_providers = list(PROVIDERS.keys())
+
+        selected_provider = State.get(StateKey.LLM_PROVIDER, llm_providers[0])
+        models = list(MODELS.get(PROVIDERS[selected_provider]))
+
         st.write("### Configuration")
-        st.selectbox("LLM Provider", ["OpenAI", "Claude", "Other"], key=State.component_key(StateKey.LLM_PROVIDER))
-        st.selectbox("Model Type", ["gpt-4o-mini", "gpt-3.5", "Claude-mini"], key=State.component_key(StateKey.MODEL))
+        st.selectbox("LLM Provider", llm_providers, key=State.component_key(StateKey.LLM_PROVIDER))
+        st.selectbox("Model Type", models, key=State.component_key(StateKey.MODEL))
         st.multiselect(
             "Security Data/Log Type(s)",
             [
@@ -82,19 +88,12 @@ class DetectionEngineeringPage:
 
     def render(self):
         """Main function to render the Streamlit app."""
-        logger.info("rerendering page")
-
         self.configure_page()
-        # improve initial state handling
-
-        # if State.get(StateKey.DETECTION_ENG_CURRENT_STEP) is None:
-        #     State.set(StateKey.DETECTION_ENG_CURRENT_STEP, DETECTION_ENGINEERING_STEPS[0])
-
         self.render_sidebar()
         self.render_main_header()
-        tabs = self.render_tabs()
+        # tabs = self.render_tabs()
 
         detection_tab = DetectionCreationView()
 
-        with tabs[0]:
-            detection_tab.render()
+        # with tabs[0]:
+        detection_tab.render()
