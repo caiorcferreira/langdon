@@ -210,6 +210,9 @@ You are a senior threat analyst tasked with compiling a comprehensive detection 
         ## Threat Description
         [Provide a concise description of the threat behavior this detection aims to identify.]
 
+        ## MITRE
+        [Provide the MITRE ATT&CK tactic associated with this detection.]
+
         ## Detection Rule
         {detection_language}
         ```{previous_detection_rule}```
@@ -224,7 +227,9 @@ You are a senior threat analyst tasked with compiling a comprehensive detection 
         [Include brief notes on expected performance, including estimated false positive rate.]
 
         ## Quality Assessment
-        [Provide the overall score out of 100 and summarize the key points from the QA Findings.]
+        **Score**: [Provide the overall score out of 100]
+
+        [Summarize the key points from the QA Findings.]
 
 3.	Review and Finalize
     - Ensure all sections are complete and accurately reflect the provided information.
@@ -232,7 +237,6 @@ You are a senior threat analyst tasked with compiling a comprehensive detection 
     - Verify that the document is ready for review and implementation by the security operations team.
 
 # ADDITIONAL INSTRUCTIONS
-
 - If any information is missing or incomplete, indicate this in the relevant section.
 - Keep code blocks and explanations separate for clarity.
 - Ensure your response is free of errors and adheres to the specified format.
