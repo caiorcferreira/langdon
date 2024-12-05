@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "detection-eng-llm"
+name = "langdon"
 version = "0.1.0"
 description = ""
 authors = ["Caio Ferreira"]
@@ -10,6 +10,10 @@ python = "^3.12"
 streamlit = "^1.40.2"
 dspy = "^2.5.41"
 pyperclip = "^1.9.0"
+pymupdf = "^1.24.14"
+requests = "^2.32.3"
+beautifulsoup4 = "^4.12.3"
+markdownify = "^0.14.1"
 
 
 [build-system]

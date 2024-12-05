@@ -7,24 +7,24 @@ PROVIDERS = {
     "Antropic": "antropic",
 }
 MODELS = {
-    "openai": {
+    "openai": [
+        "gpt-4o-mini",
         "o1-mini",
         "o1-preview",
-        "gpt-4o-mini",
         "gpt-4o",
         "gpt-4",
         "gpt-3.5-turbo",
-    },
-    "antropic": {
-        "claude-3-5-sonnet-20240620",
+    ],
+    "antropic": [
         "claude-3",
+        "claude-3-5-sonnet-20240620",
         "claude-3-haiku-20240307",
         "claude-3-opus-20240229",
         "claude-3-sonnet-20240229",
         "claude-2",
         "claude-2.1",
         "claude-instant-1.2"
-    },
+    ],
 }
 
 

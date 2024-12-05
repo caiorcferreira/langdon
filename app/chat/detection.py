@@ -4,25 +4,11 @@ from app.llm.prompt import PromptSignature
 from streamlit.logger import get_logger
 from app.state import StateKey, State, DETECTION_ENGINEERING_STEPS, DetectionEngineeringStep, step_update_transaction
 from .components import line_separator
-import pyperclip
+from app.ingestion import pdf, scrape
+import streamlit.components.v1 as components
+import base64
 
 logger = get_logger(__name__)
-
-
-def serialize_file(uploaded_file):
-    if uploaded_file.type == "application/pdf":
-        file_content = ""
-
-        pdf_document = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-        for page_num in range(pdf_document.page_count):
-            page = pdf_document.load_page(page_num)
-            file_content += page.get_text()
-
-        return file_content
-
-    else:  # todo: throw if unsupported file type
-        # Process other text files
-        return uploaded_file.getvalue().decode("utf-8")
 
 
 class DetectionDetailComponent:
@@ -292,11 +278,35 @@ class FinalSummaryStepComponent:
 
         st.markdown(summary)
 
-        if st.button("Reset", type="secondary", key="bottom_summary_reset"):
-            State.reset()
+        col1, col2, _ = st.columns([1, 1, 2])
 
-        if st.button("Copy final summary to clipboard", type="primary", key="bottom_summary_copy"):
-            pyperclip.copy(summary)
+        with col1:
+            summary_enc = base64.b64encode(summary.encode('utf-8')).decode('utf-8')
+
+            components.html(f"""
+                <script>
+                    function copyToClipboard(content) {{
+                        const textToCopy = atob(content);
+    
+                        navigator.clipboard.writeText(textToCopy)
+                    }}
+                </script>
+                <style>
+                    body {{
+                        margin: 0;
+                    }}
+                </style>
+    
+                <button id="copyButton" 
+                    style="background-color: #ff4b4b; color: white; border: none; border-radius: 8px; padding: 12px 6px; font-size: 16px; font-weight: 400; text-align: center; cursor: pointer; transition: background-color 0.3s ease, transform 0.2s ease;"
+                    onclick="copyToClipboard('{summary_enc}')">
+                    Copy final summary to clipboard
+                </button>
+            """, height=50)
+
+        with col2:
+            if st.button("Reset", type="secondary", key="bottom_summary_reset", use_container_width=True):
+                State.reset()
 
     def render_debug_info(self, success_msg, debug_info):
         st.success(success_msg)
@@ -345,9 +355,12 @@ class DetectionCreationView:
         self.render_prompt_customization()
 
         line_separator()
-        self.render_example_detections()
-        line_separator()
-        self.render_example_logs()
+
+        col1, col2 = st.columns(2)
+        with col1:
+            self.render_example_detections()
+        with col2:
+            self.render_example_logs()
 
         output_container = st.container()
         with output_container:
@@ -362,17 +375,22 @@ class DetectionCreationView:
                 threat_source is None or \
                 focus is None
 
-            if st.button(
-                "Start detection generation",
-                type="primary",
-                disabled=disable_start_button,
-            ):
-                State.advance_detection_engineering_step()
-                st.rerun()
+            col1, col2, _ = st.columns([1, 1, 2])
 
-            if st.button("Reset", type="secondary"):
-                State.reset()
-                st.rerun()
+            with col1:
+                if st.button(
+                    "Start detection generation",
+                    type="primary",
+                    disabled=disable_start_button,
+                    use_container_width=True,
+                ):
+                    State.advance_detection_engineering_step()
+                    st.rerun()
+
+            with col2:
+                if st.button("Reset", type="secondary", use_container_width=True):
+                    State.reset()
+                    st.rerun()
 
             self.render_output()
 
@@ -423,16 +441,22 @@ class DetectionCreationView:
 
         with col2:
             st.subheader("Fetch online threat intel")
-            st.text_input("Enter URL:", "")
+            scrape_url = st.text_input("Enter URL:", "")
             if st.button("Scrape URL"):
-                st.info("Scraping URL...")
+                with st.spinner("Scraping URL..."):
+                    scraped = scrape.website_to_md(scrape_url)
+                    State.set(StateKey.SCRAPED_THREAT_SOURCE, scraped)
+                    State.set(StateKey.THREAT_SOURCE, scraped)
+
+            if State.get(StateKey.SCRAPED_THREAT_SOURCE) is not None:
+                st.success("Scraping complete!")
 
             line_separator()
 
             st.subheader("Parse threat intel report")
             st.file_uploader(
                 "Upload file (optional):",
-                type=["txt", "pdf"],
+                type=["txt", "md", "pdf"],
                 key=State.component_key(StateKey.UPLOADED_THREAT_FILE),
                 label_visibility="visible",
                 on_change=self.update_threat_source_from_file,
@@ -464,7 +488,7 @@ class DetectionCreationView:
         uploaded_file = State.get(StateKey.UPLOADED_THREAT_FILE)
         logger.info(f"Uploaded File: {uploaded_file}")
 
-        State.set(StateKey.THREAT_SOURCE, serialize_file(uploaded_file))
+        State.set(StateKey.THREAT_SOURCE, pdf.serialize_file(uploaded_file))
 
     def render_example_detections(self):
         """Render the Example Detections section."""
@@ -473,7 +497,7 @@ class DetectionCreationView:
             "Number of example detections",
             min_value=1,
             max_value=5,
-            value=2,
+            value=1,
             key=State.component_key(StateKey.EXAMPLE_DETECTIONS, suffix="_size"),
         )
 
@@ -494,7 +518,7 @@ class DetectionCreationView:
             "Number of example logs",
             min_value=1,
             max_value=5,
-            value=2,
+            value=1,
             key=State.component_key(StateKey.EXAMPLE_LOGS, suffix="_size")
         )
 

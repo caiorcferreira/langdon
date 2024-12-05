@@ -30,7 +30,7 @@ class DetectionEngineeringPage:
         llm_providers = list(PROVIDERS.keys())
 
         selected_provider = State.get(StateKey.LLM_PROVIDER, llm_providers[0])
-        models = list(MODELS.get(PROVIDERS[selected_provider]))
+        models = MODELS.get(PROVIDERS[selected_provider])
 
         st.write("### Configuration")
         st.selectbox("LLM Provider", llm_providers, key=State.component_key(StateKey.LLM_PROVIDER))

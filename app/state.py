@@ -50,6 +50,7 @@ class StateKey(Enum):
     THREAT_SOURCE = "threat_source"
     THREAT_SOURCE_FOCUS = "threat_source_focus"
     UPLOADED_THREAT_FILE = "uploaded_threat_file"
+    SCRAPED_THREAT_SOURCE = "scraped_threat_source"
 
     EXAMPLE_DETECTIONS = "example_detections"
     EXAMPLE_LOGS = "example_logs"
