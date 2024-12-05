@@ -30,7 +30,7 @@ class SuggestDetectionStepComponent:
         if detections is not None:
             return detections
 
-        threat_source = State.get(StateKey.THREAT_SOURCES)
+        threat_sources = State.get(StateKey.THREAT_SOURCES)
         focus = State.get(StateKey.THREAT_SOURCE_FOCUS)
         data_source = State.get(StateKey.DATA_SOURCE)
         model_params = {
@@ -43,7 +43,7 @@ class SuggestDetectionStepComponent:
         with st.spinner("Analyzing threat intelligence..."):
             detections = PromptSignature.suggest_detections_from_intel(
                 focus=focus,
-                report=threat_source,
+                reports=threat_sources,
                 data_source=data_source,
                 model_params=model_params,
             )
