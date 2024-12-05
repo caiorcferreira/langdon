@@ -30,7 +30,7 @@ class SuggestDetectionStepComponent:
         if detections is not None:
             return detections
 
-        threat_source = State.get(StateKey.THREAT_SOURCE)
+        threat_source = State.get(StateKey.THREAT_SOURCES)
         focus = State.get(StateKey.THREAT_SOURCE_FOCUS)
         data_source = State.get(StateKey.DATA_SOURCE)
         model_params = {

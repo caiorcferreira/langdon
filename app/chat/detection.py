@@ -35,7 +35,7 @@ class DetectionCreationView:
 
             # this guard clause would be better inside the SuggestDetectionStepComponent.run_analysis method
             # but due to the imperative nature of streamlit, it lives here.
-            threat_source = State.get(StateKey.THREAT_SOURCE)
+            threat_source = State.get(StateKey.THREAT_SOURCES)
             focus = State.get(StateKey.THREAT_SOURCE_FOCUS)
 
             disable_start_button = State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.INIT or \
@@ -108,7 +108,7 @@ class DetectionCreationView:
         if st.button("Add threat source", type="secondary"):
             self.render_threat_source_modal()
 
-        sources = State.get(StateKey.THREAT_SOURCE, [])
+        sources = State.get(StateKey.THREAT_SOURCES, [])
         for i, source in enumerate(sources):
             with st.expander(f"Threat Source {i + 1}", expanded=False):
                 st.write(f"**Type:** {source['type']}")
@@ -118,10 +118,10 @@ class DetectionCreationView:
 
     def remove_threat_source(self, index):
         def remove_at():
-            sources = State.get(StateKey.THREAT_SOURCE)
+            sources = State.get(StateKey.THREAT_SOURCES)
             sources.pop(index)
 
-            State.set(StateKey.THREAT_SOURCE, sources)
+            State.set(StateKey.THREAT_SOURCES, sources)
 
         return remove_at
 
@@ -152,12 +152,12 @@ class DetectionCreationView:
             if State.get(StateKey.SCRAPED_THREAT_SOURCE) is not None:
                 scraped = State.get(StateKey.SCRAPED_THREAT_SOURCE)
 
-                State.append(StateKey.THREAT_SOURCE, {'type': 'scrape', 'id': scrape_url,  'content': scraped})
+                State.append(StateKey.THREAT_SOURCES, {'type': 'scrape', 'id': scrape_url, 'content': scraped})
             elif State.get(StateKey.UPLOADED_THREAT_FILE) is not None:
                 uploaded_file = State.get(StateKey.UPLOADED_THREAT_FILE)
                 file_content = pdf.serialize_file(uploaded_file)
 
-                State.append(StateKey.THREAT_SOURCE, {'type': 'file', 'id': uploaded_file.name,  'content': file_content})
+                State.append(StateKey.THREAT_SOURCES, {'type': 'file', 'id': uploaded_file.name, 'content': file_content})
 
             st.rerun()
 

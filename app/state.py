@@ -47,7 +47,7 @@ class StateKey(Enum):
 
     DETECTION_ENG_CURRENT_STEP = "detection_eng_current_step"
 
-    THREAT_SOURCE = "threat_source"
+    THREAT_SOURCES = "threat_sources"
     THREAT_SOURCE_FOCUS = "threat_source_focus"
     UPLOADED_THREAT_FILE = "uploaded_threat_file"
     SCRAPED_THREAT_SOURCE = "scraped_threat_source"
