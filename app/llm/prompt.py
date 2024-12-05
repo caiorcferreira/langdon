@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional, Any
 from app.llm.setup import configure_lm
 from dspy.utils.callback import BaseCallback
+from dspy.clients.base_lm import GLOBAL_HISTORY
 
 class Detection(BaseModel):
     name: str = Field(description="detection rule concise name")
@@ -249,6 +250,15 @@ You are a senior threat analyst tasked with compiling a comprehensive detection 
     final_summary: str = dspy.OutputField(desc="markdown-formatted document for the detection package")
 
 
+class Debug:
+    prompt: str
+    response: str
+
+    def __init__(self, prompt: str, response: str):
+        self.prompt = prompt
+        self.response = response
+
+
 class PromptSignature:
     @staticmethod
     def suggest_detections_from_intel(goal: str, reports: list[str], data_source: str, model_params: dict) -> list[Detection]:
@@ -265,11 +275,9 @@ class PromptSignature:
     @staticmethod
     def create_detection_rule(detection_description: Detection, detection_language: str, example_logs: list[str], example_detections: list[str], detection_steps: Optional[str], model_params: dict):
         """Create a detection rule based on the provided detection description."""
-        logging_callback = ModuleLoggingCallback()
-
         llm_ctx, model_params = PromptSignature.llm_context(model_params)
         with llm_ctx:
-            predictor = dspy.ChainOfThought(CreateDetectionRule, callbacks=[logging_callback], **model_params)
+            predictor = dspy.ChainOfThought(CreateDetectionRule, **model_params)
             output = predictor(
                 detection_description=detection_description,
                 detection_language=detection_language,
@@ -277,55 +285,50 @@ class PromptSignature:
                 example_detection_rules=example_detections,
                 detection_steps=detection_steps,
             )
-            rendered_prompt = logging_callback.history
+            rendered_prompt = _render_prompts()
 
             dspy.inspect_history(n=1)
 
-        return output.detection_rule, rendered_prompt
+        return output.detection_rule, Debug(*rendered_prompt)
 
     @staticmethod
     def develop_investigation_guide(detection_rule: DetectionRule, standard_op_procedure: Optional[str], model_params: dict):
-        logging_callback = ModuleLoggingCallback()
-
         llm_ctx, model_params = PromptSignature.llm_context(model_params)
         with llm_ctx:
-            predictor = dspy.ChainOfThought(DevelopInvestigationGuide, callbacks=[logging_callback], **model_params)
+            predictor = dspy.ChainOfThought(DevelopInvestigationGuide, **model_params)
             output = predictor(
                 detection_rule=detection_rule,
                 example_standard_operation_procedure=standard_op_procedure,
             )
-            rendered_prompt = logging_callback.history
+            rendered_prompt = _render_prompts()
 
             dspy.inspect_history(n=1)
 
-        return output.investigation_guide, rendered_prompt
+        return output.investigation_guide, Debug(*rendered_prompt)
 
     @staticmethod
     def qa_review(detection_description: Detection, detection_rule: DetectionRule, model_params: dict):
         """Conduct a thorough and comprehensive review of a given detection rule."""
-        logging_callback = ModuleLoggingCallback()
-
         llm_ctx, model_params = PromptSignature.llm_context(model_params)
         with llm_ctx:
-            predictor = dspy.ChainOfThought(QAReview, callbacks=[logging_callback], **model_params)
+            predictor = dspy.ChainOfThought(QAReview, **model_params)
             output = predictor(
                 detection_description=detection_description,
                 detection_rule=detection_rule,
             )
-            rendered_prompt = logging_callback.history
+            rendered_prompt = _render_prompts()
 
             dspy.inspect_history(n=1)
 
-        return output.score, output.assessment, rendered_prompt
+        return output.score, output.assessment, Debug(*rendered_prompt)
 
     @staticmethod
     def final_summary(detection_description: Detection, detection_rule: DetectionRule, investigation_guide: str, qa_assessment: str, qa_score: int, model_params: dict):
         """Compile a comprehensive detection package for the security operations team."""
-        logging_callback = ModuleLoggingCallback()
 
         llm_ctx, model_params = PromptSignature.llm_context(model_params)
         with llm_ctx:
-            predictor = dspy.ChainOfThought(FinalSummary, callbacks=[logging_callback], **model_params)
+            predictor = dspy.ChainOfThought(FinalSummary, **model_params)
             output = predictor(
                 detection_description=detection_description,
                 detection_rule=detection_rule,
@@ -333,11 +336,11 @@ class PromptSignature:
                 qa_assessment=qa_assessment,
                 qa_score=qa_score,
             )
-            rendered_prompt = logging_callback.history
+            rendered_prompt = _render_prompts()
 
             dspy.inspect_history(n=1)
 
-        return output.final_summary, rendered_prompt
+        return output.final_summary, Debug(*rendered_prompt)
 
     @staticmethod
     def llm_context(model_params: dict):
@@ -352,55 +355,52 @@ class PromptSignature:
         return dspy.context(lm=lm), model_params
 
 
-class ModuleLoggingCallback(BaseCallback):
-    def __init__(self):
-        self.history = ""
-
-    def on_lm_start(self, call_id, instance, inputs):
-        self.history += "Input prompt:\n"
-        for k, v in inputs.items():
-            self.history += f"{k}: {v}\n"
-
-        self.history += "\n"
-
-    def on_module_end(
-        self,
-        call_id: str,
-        outputs: Optional[Any],
-        exception: Optional[Exception] = None,
-    ):
-        self.history += "Response:\n"
-        for k, v in outputs.items():
-            self.history += f"{k}: {v}\n"
-
-        self.history += "\n"
+def _render_prompts():
+    return _format_history(GLOBAL_HISTORY[-1:])
 
 
-# def configure_lm(provider: Literal["genplat", "openai"]):
-#     if provider == "genplat":
-#         print("Using GenPlat")
-#
-#         default_headers = {
-#             'x-requester-token': os.getenv('GENPLAT_API_KEY')
-#         }
-#
-#         lm = dspy.LM(
-#             model='openai/gpt-3.5-turbo-1106',
-#             api_base=os.getenv('GENPLAT_BASE_URL'),
-#             api_key="dummy",
-#             extra_headers=default_headers
-#         )
-#
-#     elif provider == "openai":
-#         print("Using OpenAI")
-#
-#         lm = dspy.LM(
-#             model='openai/gpt-4o-mini',
-#             api_key=os.getenv('OPENAI_API_KEY')
-#         )
-#     else:
-#         raise ValueError("Invalid provider")
-#
-#     dspy.configure(lm=lm)
-#
-#     return lm
+def _format_history(history):
+    """Format prompts and their completions."""
+
+    input_prompt = ""
+    response = ""
+
+    for item in history:
+        messages = item["messages"] or [{"role": "user", "content": item["prompt"]}]
+        for msg in messages:
+            input_prompt += f"{msg['role'].capitalize()} message:\n"
+            input_prompt += _format_message_content(msg["content"])
+            input_prompt += "\n"
+
+        outputs = item["outputs"]
+        response += outputs[0].strip()
+
+        if len(outputs) > 1:
+            choices_text = f" \t (and {len(outputs)-1} other completions)\n"
+            response += choices_text
+
+    input_prompt += "\n"
+    response += "\n"
+
+    return input_prompt, response
+
+
+def _format_message_content(content: str | list[dict[str, Any]]):
+    if isinstance(content, str):
+        return f"{content.strip()}\n"
+
+    if not isinstance(content, list):
+        return
+
+    for c in content:
+        if c["type"] == "text":
+            return f"{c['text'].strip()}\n"
+        elif c["type"] == "image_url":
+            image_str = ""
+            if "base64" in c["image_url"].get("url", ""):
+                len_base64 = len(c["image_url"]["url"].split("base64,")[1])
+                image_str = f"<{c['image_url']['url'].split('base64,')[0]}base64,<IMAGE BASE 64 ENCODED({str(len_base64)})>"
+            else:
+                image_str = f"<image_url: {c['image_url']['url']}>"
+
+            return f"{image_str.strip()}\n"

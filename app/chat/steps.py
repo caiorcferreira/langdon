@@ -2,7 +2,7 @@ import base64
 import streamlit as st
 from streamlit.components import v1 as components
 from streamlit.logger import get_logger
-from app.chat.components import DetectionDetailComponent, line_separator
+from app.chat.components import DetectionDetailComponent, DebugInfoComponent, line_separator
 from app.llm.prompt import PromptSignature
 from app.state import step_update_transaction, State, StateKey, DetectionEngineeringStep
 
@@ -105,14 +105,9 @@ class GenerateRuleStepComponent:
 
         with step_update_transaction():
             _, debug_info = self.run_create_rule()
-            self.render_detection_rule(debug_info)
 
-    def render_detection_rule(self, debug_info):
-        st.success("Create detection rule complete!")
-
-        with st.expander("View Details", expanded=False):
-            st.write("Debug information:")
-            st.text(debug_info)
+            debug = DebugInfoComponent()
+            debug.render(success_msg="Create Detection Rule complete!", debug_info=debug_info)
 
     def run_create_rule(self):
         created_detection = State.get(StateKey.DETECTION_RULE)
@@ -161,14 +156,9 @@ class InvestigationGuideStepComponent:
 
         with step_update_transaction():
             _, debug_info = self.run_develop_guide()
-            self.render_debug_info(success_msg="Develop Investigation Guide complete!", debug_info=debug_info)
 
-    def render_debug_info(self, success_msg, debug_info):
-        st.success(success_msg)
-
-        with st.expander("View Details", expanded=False):
-            st.write("Debug information:")
-            st.text(debug_info)
+            debug = DebugInfoComponent()
+            debug.render(success_msg="Develop Investigation Guide complete!", debug_info=debug_info)
 
     def run_develop_guide(self):
         guide = State.get(StateKey.INVESTIGATION_GUIDE)
@@ -208,19 +198,14 @@ class QAReviewStepComponent:
 
         with step_update_transaction():
             _, _, debug_info = self.run_review()
-            self.render_debug_info(success_msg="Quality Assurance Review complete!", debug_info=debug_info)
 
-    def render_debug_info(self, success_msg, debug_info):
-        st.success(success_msg)
-
-        with st.expander("View Details", expanded=False):
-            st.write("Debug information:")
-            st.text(debug_info)
+            debug = DebugInfoComponent()
+            debug.render(success_msg="Quality Assurance Review complete!", debug_info=debug_info)
 
     def run_review(self):
         review = State.get(StateKey.QA_REVIEW)
         if review is not None:
-            return review[0], review[1], review[1]
+            return review[0], review[1], review[2]
 
         selected_detection = State.get(StateKey.SELECTED_DETECTION)
         detection_rule, _ = State.get(StateKey.DETECTION_RULE)
@@ -251,11 +236,11 @@ class FinalSummaryStepComponent:
         st.subheader("Step 5: Final Summary")
 
         _, debug_info = self.run_summary()
-        self.render_debug_info(success_msg="Final Summary complete!", debug_info=debug_info)
+        debug = DebugInfoComponent()
+        debug.render(success_msg="Final Summary complete!", debug_info=debug_info)
+
         line_separator()
         self.render_summary()
-
-        # st.rerun()
 
     def render_summary(self):
         summary, _ = State.get(StateKey.FINAL_SUMMARY)
