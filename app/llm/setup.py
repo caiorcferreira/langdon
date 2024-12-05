@@ -56,30 +56,4 @@ def configure_lm(provider, model):
 
     lm = dspy.LM(**lm_args)
 
-    # if provider == "genplat":
-    #     print("Using GenPlat")
-    #
-    #     default_headers = {
-    #         'x-requester-token': os.getenv('GENPLAT_API_KEY')
-    #     }
-    #
-    #     lm = dspy.LM(
-    #         model='openai/gpt-3.5-turbo-1106',
-    #         api_base=os.getenv('GENPLAT_BASE_URL'),
-    #         api_key="dummy",
-    #         extra_headers=default_headers
-    #     )
-    #
-    # elif provider == "openai":
-    #     print("Using OpenAI")
-    #
-    #     lm = dspy.LM(
-    #         model='openai/gpt-4o-mini',
-    #         api_key=os.getenv('OPENAI_API_KEY')
-    #     )
-    # else:
-    #     raise ValueError("Invalid provider")
-
-    # dspy.configure(lm=lm)
-
     return lm

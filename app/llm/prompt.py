@@ -251,7 +251,7 @@ You are a senior threat analyst tasked with compiling a comprehensive detection 
 
 class PromptSignature:
     @staticmethod
-    def suggest_detections_from_intel(goal: str, reports: str, data_source: str, model_params: dict) -> list[Detection]:
+    def suggest_detections_from_intel(goal: str, reports: list[str], data_source: str, model_params: dict) -> list[Detection]:
         """Interpret the threat intelligence report and extract potential detections."""
         llm_ctx, model_params = PromptSignature.llm_context(model_params)
         with llm_ctx:

@@ -31,7 +31,7 @@ class SuggestDetectionStepComponent:
             return detections
 
         goal = State.get(StateKey.DETECTION_GOAL)
-        threat_sources = State.get(StateKey.THREAT_SOURCES)
+        threat_sources = State.get(StateKey.THREAT_SOURCES, [])
         data_source = State.get(StateKey.DATA_SOURCE)
         model_params = {
             "temperature": State.get(StateKey.MODEL_TEMPERATURE),
@@ -39,6 +39,8 @@ class SuggestDetectionStepComponent:
             "llm_provider": State.get(StateKey.LLM_PROVIDER),
             "model": State.get(StateKey.MODEL),
         }
+
+        threat_sources = [source['content'] for source in threat_sources]
 
         with st.spinner("Analyzing threat intelligence..."):
             detections = PromptSignature.suggest_detections_from_intel(

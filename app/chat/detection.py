@@ -35,11 +35,9 @@ class DetectionCreationView:
 
             # this guard clause would be better inside the SuggestDetectionStepComponent.run_analysis method
             # but due to the imperative nature of streamlit, it lives here.
-            threat_source = State.get(StateKey.THREAT_SOURCES)
             goal = State.get(StateKey.DETECTION_GOAL)
 
             disable_start_button = State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.INIT or \
-                threat_source is None or \
                 goal is None
 
             col1, col2, _ = st.columns([1, 1, 2])
@@ -165,7 +163,6 @@ class DetectionCreationView:
             st.rerun()
 
 
-
     def render_prompt_customization(self):
         st.write("**Prompt customization**")
         with st.expander("Detection Steps", expanded=False):
@@ -190,8 +187,6 @@ class DetectionCreationView:
         """Update the threat source based on the uploaded file."""
         uploaded_file = State.get(StateKey.UPLOADED_THREAT_FILE)
         logger.info(f"Uploaded File: {uploaded_file}")
-
-        # State.set(StateKey.THREAT_SOURCE, pdf.serialize_file(uploaded_file))
 
     def render_example_detections(self):
         """Render the Example Detections section."""
