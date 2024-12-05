@@ -98,11 +98,21 @@ class State:
 
     @staticmethod
     def set(key: StateKey | str, value: Any):
-        key_val = key
-        if isinstance(key, StateKey):
-            key_val = key.value
+        st.session_state[State._key_val(key)] = value
 
-        st.session_state[key_val] = value
+    @staticmethod
+    def set_index(key: StateKey | str, index: int, value: Any):
+        list_val = State.get(key)
+        list_val[index] = value
+
+        State.set(key, list_val)
+
+    @staticmethod
+    def append(key: StateKey | str, value: Any):
+        list_val = State.get(key, [])
+        list_val.append(value)
+
+        State.set(key, list_val)
 
     @staticmethod
     def advance_detection_engineering_step():
@@ -125,19 +135,19 @@ class State:
 
     @staticmethod
     def get(key: StateKey | str, default=None):
-        key_val = key
-        if isinstance(key, StateKey):
-            key_val = key.value
-
-        return st.session_state.get(key_val, default)
+        return st.session_state.get(State._key_val(key), default)
 
     @staticmethod
     def has(key: StateKey | str) -> bool:
+        return State._key_val(key) in st.session_state
+
+    @staticmethod
+    def _key_val(key: StateKey | str) -> str:
         key_val = key
         if isinstance(key, StateKey):
             key_val = key.value
 
-        return key_val in st.session_state
+        return key_val
 
 
 def step_update_transaction():

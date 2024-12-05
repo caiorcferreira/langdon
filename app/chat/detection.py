@@ -98,36 +98,69 @@ class DetectionCreationView:
         st.subheader("Threat Intelligence")
         col1, col2 = st.columns([1, 1])
 
-        with col1:
-            st.text_area(
-                "Explain your focus subject in the threat report:",
-                key=State.component_key(StateKey.THREAT_SOURCE_FOCUS),
-                placeholder="Detect persistence and execution from a compromised Lambda.",
-                height=400,
-            )
+        st.text_area(
+            "Explain your focus subject in the threat report:",
+            key=State.component_key(StateKey.THREAT_SOURCE_FOCUS),
+            placeholder="Detect persistence and execution from a compromised Lambda.",
+            height=400,
+        )
 
-        with col2:
-            st.subheader("Fetch online threat intel")
-            scrape_url = st.text_input("Enter URL:", "")
-            if st.button("Scrape URL"):
-                with st.spinner("Scraping URL..."):
-                    scraped = scrape.website_to_md(scrape_url)
-                    State.set(StateKey.SCRAPED_THREAT_SOURCE, scraped)
-                    State.set(StateKey.THREAT_SOURCE, scraped)
+        if st.button("Add threat source", type="secondary"):
+            self.render_threat_source_modal()
 
+        sources = State.get(StateKey.THREAT_SOURCE, [])
+        for i, source in enumerate(sources):
+            with st.expander(f"Threat Source {i + 1}", expanded=False):
+                st.write(f"**Type:** {source['type']}")
+                st.write(f"**ID:** {source['id']}")
+
+                st.button("Remove", key=f"remove_source_{i}", on_click=self.remove_threat_source(i))
+
+    def remove_threat_source(self, index):
+        def remove_at():
+            sources = State.get(StateKey.THREAT_SOURCE)
+            sources.pop(index)
+
+            State.set(StateKey.THREAT_SOURCE, sources)
+
+        return remove_at
+
+    @st.dialog(title="New Threat Source")
+    def render_threat_source_modal(self):
+        st.subheader("Fetch online threat intel")
+        scrape_url = st.text_input("Enter URL:", "")
+        if st.button("Scrape URL"):
+            with st.spinner("Scraping URL..."):
+                scraped = scrape.website_to_md(scrape_url)
+                State.set(StateKey.SCRAPED_THREAT_SOURCE, scraped)
+
+        if State.get(StateKey.SCRAPED_THREAT_SOURCE) is not None:
+            st.success("Scraping complete!")
+
+        line_separator()
+
+        st.subheader("Parse threat intel report")
+        st.file_uploader(
+            "Upload file (optional):",
+            type=["txt", "md", "pdf"],
+            key=State.component_key(StateKey.UPLOADED_THREAT_FILE),
+            label_visibility="visible",
+            on_change=self.update_threat_source_from_file,
+        )
+
+        if st.button("Submit", type="primary"):
             if State.get(StateKey.SCRAPED_THREAT_SOURCE) is not None:
-                st.success("Scraping complete!")
+                scraped = State.get(StateKey.SCRAPED_THREAT_SOURCE)
 
-            line_separator()
+                State.append(StateKey.THREAT_SOURCE, {'type': 'scrape', 'id': scrape_url,  'content': scraped})
+            elif State.get(StateKey.UPLOADED_THREAT_FILE) is not None:
+                uploaded_file = State.get(StateKey.UPLOADED_THREAT_FILE)
+                file_content = pdf.serialize_file(uploaded_file)
 
-            st.subheader("Parse threat intel report")
-            st.file_uploader(
-                "Upload file (optional):",
-                type=["txt", "md", "pdf"],
-                key=State.component_key(StateKey.UPLOADED_THREAT_FILE),
-                label_visibility="visible",
-                on_change=self.update_threat_source_from_file,
-            )
+                State.append(StateKey.THREAT_SOURCE, {'type': 'file', 'id': uploaded_file.name,  'content': file_content})
+
+            st.rerun()
+
 
 
     def render_prompt_customization(self):
@@ -155,7 +188,7 @@ class DetectionCreationView:
         uploaded_file = State.get(StateKey.UPLOADED_THREAT_FILE)
         logger.info(f"Uploaded File: {uploaded_file}")
 
-        State.set(StateKey.THREAT_SOURCE, pdf.serialize_file(uploaded_file))
+        # State.set(StateKey.THREAT_SOURCE, pdf.serialize_file(uploaded_file))
 
     def render_example_detections(self):
         """Render the Example Detections section."""
