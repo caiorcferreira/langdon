@@ -47,8 +47,8 @@ class StateKey(Enum):
 
     DETECTION_ENG_CURRENT_STEP = "detection_eng_current_step"
 
+    DETECTION_GOAL = "detection_goal"
     THREAT_SOURCES = "threat_sources"
-    THREAT_SOURCE_FOCUS = "threat_source_focus"
     UPLOADED_THREAT_FILE = "uploaded_threat_file"
     SCRAPED_THREAT_SOURCE = "scraped_threat_source"
 
@@ -106,6 +106,13 @@ class State:
         list_val[index] = value
 
         State.set(key, list_val)
+
+    @staticmethod
+    def delete(key: StateKey | str):
+        if not State.has(key):
+            return
+
+        del st.session_state[State._key_val(key)]
 
     @staticmethod
     def append(key: StateKey | str, value: Any):

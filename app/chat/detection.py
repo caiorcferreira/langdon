@@ -36,11 +36,11 @@ class DetectionCreationView:
             # this guard clause would be better inside the SuggestDetectionStepComponent.run_analysis method
             # but due to the imperative nature of streamlit, it lives here.
             threat_source = State.get(StateKey.THREAT_SOURCES)
-            focus = State.get(StateKey.THREAT_SOURCE_FOCUS)
+            goal = State.get(StateKey.DETECTION_GOAL)
 
             disable_start_button = State.get(StateKey.DETECTION_ENG_CURRENT_STEP) != DetectionEngineeringStep.INIT or \
                 threat_source is None or \
-                focus is None
+                goal is None
 
             col1, col2, _ = st.columns([1, 1, 2])
 
@@ -95,15 +95,16 @@ class DetectionCreationView:
 
     def render_threat_intelligence_input(self):
         """Render the Threat Intelligence Input section."""
-        st.subheader("Threat Intelligence")
-        col1, col2 = st.columns([1, 1])
+        st.subheader("Detection Goal")
 
         st.text_area(
-            "Explain your focus subject in the threat report:",
-            key=State.component_key(StateKey.THREAT_SOURCE_FOCUS),
+            "Explain your goal (it will help ignoring irrelevant information in reports):",
+            key=State.component_key(StateKey.DETECTION_GOAL),
             placeholder="Detect persistence and execution from a compromised Lambda.",
             height=400,
         )
+
+        st.subheader("Threat Intelligence")
 
         if st.button("Add threat source", type="secondary"):
             self.render_threat_source_modal()
@@ -153,11 +154,13 @@ class DetectionCreationView:
                 scraped = State.get(StateKey.SCRAPED_THREAT_SOURCE)
 
                 State.append(StateKey.THREAT_SOURCES, {'type': 'scrape', 'id': scrape_url, 'content': scraped})
+                State.delete(StateKey.SCRAPED_THREAT_SOURCE)
             elif State.get(StateKey.UPLOADED_THREAT_FILE) is not None:
                 uploaded_file = State.get(StateKey.UPLOADED_THREAT_FILE)
                 file_content = pdf.serialize_file(uploaded_file)
 
                 State.append(StateKey.THREAT_SOURCES, {'type': 'file', 'id': uploaded_file.name, 'content': file_content})
+                State.delete(StateKey.UPLOADED_THREAT_FILE)
 
             st.rerun()
 

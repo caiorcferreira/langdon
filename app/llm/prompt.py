@@ -28,7 +28,7 @@ of techniques, tactics and procedures (TTPs) used by cybersecurity threat actors
 - Provide a list with at least one detection rule for each TTP identified in the threat intelligence report.
 - If no detections are found, return an empty list."""
 
-    focus: str = dspy.InputField(desc="brief description about which content of threat intelligence report to focus on")
+    goal: str = dspy.InputField(desc="brief description of the detection goal, used to guide the focus on intelligence")
     reports: list[str] = dspy.InputField(desc="list of threat intelligence reports")
     data_source: str = dspy.InputField(desc="data sources to write detections for")
     suggested_detections: list[Detection] = dspy.OutputField(desc="a list of suggested detections based on the threat intelligence")
@@ -251,12 +251,12 @@ You are a senior threat analyst tasked with compiling a comprehensive detection 
 
 class PromptSignature:
     @staticmethod
-    def suggest_detections_from_intel(focus: str, reports: str, data_source: str, model_params: dict) -> list[Detection]:
+    def suggest_detections_from_intel(goal: str, reports: str, data_source: str, model_params: dict) -> list[Detection]:
         """Interpret the threat intelligence report and extract potential detections."""
         llm_ctx, model_params = PromptSignature.llm_context(model_params)
         with llm_ctx:
             predictor = dspy.ChainOfThought(SuggestDetectionFromIntel, **model_params)
-            output = predictor(focus=focus, reports=reports, data_source=data_source)
+            output = predictor(goal=goal, reports=reports, data_source=data_source)
 
             dspy.inspect_history(n=1)
 
