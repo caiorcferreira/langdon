@@ -8,6 +8,7 @@
     ```sh
     docker build -t langdon:latest .
     ```
+4. Create a `.env` file in the root directory of the project using `.env.example` and replace the values.
 3. Run the Docker container:
     ```sh
     docker run --rm -p 8081:8081 --env-file ./.env langdon:latest
